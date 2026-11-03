@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Soghat-e-Chakwal — Premium Pakistani Food E-Commerce Platform
 
-## Getting Started
+A production-quality, cinematic e-commerce website built for **Soghat-e-Chakwal** (*From Farm to Fork*). Inspired by the agricultural heritage of Chakwal, Punjab, and the beloved slogan *"Wohi Purana Desi Zaiqa, Ab Har Ghar Mein!"*.
 
-First, run the development server:
+---
 
+## 🌿 Tech Stack
+
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+- **Language**: [TypeScript](https://www.typescriptlang.org/) (Strict mode, 100% typecheck clean)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) with brand color tokens
+- **Animations**: [Framer Motion](https://www.framer.com/motion/) & CSS keyframe kinetics
+- **State Management**: [Zustand](https://zustand-demo.pmnd.rs/) with localStorage persistence
+- **Forms & Validation**: [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Database / Backend**: Built-in memory seed store for demo; complete [Supabase](https://supabase.com/) SQL schema included in `supabase/schema.sql`
+
+---
+
+## 🎨 Brand Design System
+
+| Color | Hex | Role |
+|---|---|---|
+| **Deep Forest Green** | `#103D2A` | Primary brand tone, editorial depth |
+| **Heritage Gold** | `#D4A437` | Accent highlights, buttons, badges |
+| **Warm Cream** | `#FFF8E9` | Ambient cards, warm backgrounds |
+| **Soft Ivory** | `#F9F5EC` | Primary page canvas |
+| **Dark Charcoal** | `#222822` | Typography & night contrasts |
+| **Muted Terracotta** | `#A85B36` | Subheadings & labels |
+
+---
+
+## 🚀 Getting Started
+
+### 1. Development Mode
+To start the development server on `localhost:3000`:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Production Build & Start
+```bash
+npm run build
+npm start
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Admin Portal Access
+Navigate to:
+```
+http://localhost:3000/admin
+```
+- **Demo Password**: `admin123` (or `soghat`)
+- Features: Inventory control, real-time sales metrics, order status tracking, and delivery settings.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 📦 Key Pages & Routes
 
-To learn more about Next.js, take a look at the following resources:
+- `/` — Cinematic Homepage (Hero, Featured Products, Family Story, Farm-to-Fork process, Why Choose Us)
+- `/shop` — Store catalog with multi-category expansion pills
+- `/products/mustard-oil` — Product Detail page (1L & 500ml variants, dynamic packaging renderers, Accordion tabs, sticky mobile bar)
+- `/cart` — Full shopping cart with shipping progress bar
+- `/checkout` — Comprehensive Pakistani checkout form with Cash on Delivery & Direct Bank Transfer
+- `/order-confirmation` — Order tracking code, timeline, and WhatsApp follow-up
+- `/our-story` — Brand narrative celebrating Chakwal's Potohar heritage
+- `/our-process` — 4-stage transparent production breakdown
+- `/contact` — Interactive message form, helpline, and verified store address
+- `/privacy-policy`, `/shipping-policy`, `/return-policy`, `/terms` — Comprehensive customer policy documents
+- `/admin` — Protected administrative dashboard
+- `/api/orders` — REST endpoint for creating and updating orders
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📱 WhatsApp Integration
 
-## Deploy on Vercel
+- **Official Business Number**: `+92 300 8325693`
+- Direct message generators automatically encode product name, selected bottle size, unit price, quantity, and customer delivery requirements.
+- Floating WhatsApp button with pulsing beacon is active across all pages.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🗄️ Supabase Deployment (Optional Production DB)
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Go to the SQL Editor and execute the script in `supabase/schema.sql`.
+3. Copy your project URL and service keys into `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
