@@ -4,16 +4,24 @@
 // Order Confirmation Page — Soghat-e-Chakwal
 // ============================================================
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { CheckCircle2, MessageCircle, Package, ArrowRight, Home } from 'lucide-react';
 import { siteConfig } from '@/lib/config';
+import { trackEvent } from '@/lib/pixel';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('orderNumber') || 'SEC-ORDER';
+
+  useEffect(() => {
+    trackEvent('Purchase', {
+      order_id: orderNumber,
+      currency: 'PKR',
+    });
+  }, [orderNumber]);
 
   const whatsappMessage = encodeURIComponent(
     `Assalam-o-Alaikum! I have placed an order with Order ID: *${orderNumber}* on Soghat-e-Chakwal. Please share my delivery update.`

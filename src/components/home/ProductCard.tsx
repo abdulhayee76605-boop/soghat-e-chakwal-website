@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ShoppingCart } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { useCartStore } from '@/lib/cart-store';
+import { trackEvent } from '@/lib/pixel';
 
 interface ProductCardProps {
   product: Product;
@@ -22,6 +23,13 @@ export default function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = () => {
     if (firstVariant) {
       addItem(product, firstVariant, 1);
+      trackEvent('AddToCart', {
+        content_name: product.name,
+        content_ids: [firstVariant.id || product.id],
+        content_type: 'product',
+        value: firstVariant.price,
+        currency: 'PKR',
+      });
       openCart();
     }
   };

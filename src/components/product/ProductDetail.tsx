@@ -5,7 +5,7 @@
 // Clean, luxury e-commerce layout with relevant HD product images
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -28,6 +28,7 @@ import { Product, ProductVariant } from '@/lib/types';
 import { useCartStore } from '@/lib/cart-store';
 import { formatPrice } from '@/lib/utils';
 import { generateProductWhatsAppMessage, getWhatsAppUrl } from '@/lib/whatsapp';
+import { trackEvent } from '@/lib/pixel';
 
 interface ProductDetailProps {
   product: Product;
@@ -63,14 +64,36 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [addedToast, setAddedToast] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  useEffect(() => {
+    trackEvent('ViewContent', {
+      content_name: product.name,
+      content_ids: [selectedVariant.id || product.id],
+      content_type: 'product',
+      value: selectedVariant.price,
+      currency: 'PKR',
+    });
+  }, [product, selectedVariant]);
+
   const handleAddToCart = () => {
     addItem(product, selectedVariant, quantity);
+    trackEvent('AddToCart', {
+      content_name: product.name,
+      content_ids: [selectedVariant.id || product.id],
+      content_type: 'product',
+      value: selectedVariant.price * quantity,
+      currency: 'PKR',
+    });
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2500);
   };
 
   const handleBuyNow = () => {
     addItem(product, selectedVariant, quantity);
+    trackEvent('InitiateCheckout', {
+      content_name: product.name,
+      value: selectedVariant.price * quantity,
+      currency: 'PKR',
+    });
     router.push('/checkout');
   };
 

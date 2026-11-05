@@ -25,6 +25,7 @@ import { provinces } from '@/lib/config';
 import { formatPrice } from '@/lib/utils';
 import { generateWhatsAppMessage, getWhatsAppUrl } from '@/lib/whatsapp';
 import { saveNewOrder } from '@/lib/orders-db';
+import { trackEvent } from '@/lib/pixel';
 
 const checkoutSchema = z.object({
   fullName: z.string().min(3, 'Full name must be at least 3 characters'),
@@ -83,6 +84,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setMounted(true);
+    trackEvent('InitiateCheckout');
   }, []);
 
   if (!mounted) {
