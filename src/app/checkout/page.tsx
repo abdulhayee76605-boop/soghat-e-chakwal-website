@@ -24,6 +24,7 @@ import { useCartStore } from '@/lib/cart-store';
 import { provinces } from '@/lib/config';
 import { formatPrice } from '@/lib/utils';
 import { generateWhatsAppMessage, getWhatsAppUrl } from '@/lib/whatsapp';
+import { saveNewOrder } from '@/lib/orders-db';
 
 const checkoutSchema = z.object({
   fullName: z.string().min(3, 'Full name must be at least 3 characters'),
@@ -122,38 +123,28 @@ export default function CheckoutPage() {
       setIsSubmitting(true);
       setSubmitError(null);
 
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items,
-          customer: {
-            fullName: data.fullName,
-            phone: data.phone,
-            whatsapp: data.whatsapp || data.phone,
-            email: data.email,
-            address: data.address,
-            city: data.city,
-            province: data.province,
-            postalCode: data.postalCode,
-            notes: data.notes,
-          },
-          paymentMethod: data.paymentMethod,
-          subtotal,
-          shipping,
-          total,
-        }),
+      const newOrder = saveNewOrder({
+        items,
+        customer: {
+          fullName: data.fullName,
+          phone: data.phone,
+          whatsapp: data.whatsapp || data.phone,
+          email: data.email,
+          address: data.address,
+          city: data.city,
+          province: data.province,
+          postalCode: data.postalCode,
+          notes: data.notes,
+        },
+        paymentMethod: data.paymentMethod,
+        subtotal,
+        shipping,
+        total,
       });
 
-      const resData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(resData.error || 'Failed to place order');
-      }
-
-      // Success! Clear cart and redirect to order confirmation
+      // Clear cart and redirect to order confirmation
       clearCart();
-      router.push(`/order-confirmation?orderNumber=${resData.order.orderNumber}`);
+      router.push(`/order-confirmation?orderNumber=${newOrder.orderNumber}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An error occurred while placing your order';
       setSubmitError(message);

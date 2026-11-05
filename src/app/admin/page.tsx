@@ -29,6 +29,7 @@ import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
+import { getStoredOrders, updateStoredOrderStatus } from '@/lib/orders-db';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -62,13 +63,10 @@ export default function AdminPage() {
     }
   }, [isAuthenticated]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = () => {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      if (data.orders) {
-        setOrders(data.orders);
-      }
+      const stored = getStoredOrders();
+      setOrders(stored);
     } catch {
       // Fallback
     }
@@ -84,13 +82,9 @@ export default function AdminPage() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     try {
-      await fetch('/api/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, status }),
-      });
+      updateStoredOrderStatus(orderId, status);
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status } : o))
       );
@@ -102,16 +96,15 @@ export default function AdminPage() {
     }
   };
 
-  const updatePaymentStatus = async (orderId: string, paymentStatus: PaymentStatus) => {
+  const updatePaymentStatus = (orderId: string, paymentStatus: PaymentStatus) => {
     try {
-      await fetch('/api/orders', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, paymentStatus }),
+      setOrders((prev) => {
+        const updated = prev.map((o) => (o.id === orderId ? { ...o, paymentStatus } : o));
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('sec_orders', JSON.stringify(updated));
+        }
+        return updated;
       });
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, paymentStatus } : o))
-      );
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, paymentStatus } : null));
       }
