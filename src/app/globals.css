@@ -13,26 +13,27 @@
   --brand-charcoal: #222822;
   --brand-terracotta: #A85B36;
 
-  --background: var(--brand-ivory);
-  --foreground: var(--brand-charcoal);
+  --background: #F9F5EC;
+  --foreground: #222822;
 }
 
-/* Tailwind v4 Theme */
-@theme inline {
+/* Tailwind v4 Theme Tokens */
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-brand-green: var(--brand-green);
-  --color-brand-gold: var(--brand-gold);
-  --color-brand-cream: var(--brand-cream);
-  --color-brand-ivory: var(--brand-ivory);
-  --color-brand-charcoal: var(--brand-charcoal);
-  --color-brand-terracotta: var(--brand-terracotta);
+
+  --color-brand-green: #103D2A;
+  --color-brand-gold: #D4A437;
+  --color-brand-cream: #FFF8E9;
+  --color-brand-ivory: #F9F5EC;
+  --color-brand-charcoal: #222822;
+  --color-brand-terracotta: #A85B36;
   --color-brand-green-light: #1a5c3f;
   --color-brand-gold-light: #e8be5a;
   --color-brand-gold-dark: #b8902e;
 
   --font-heading: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
 /* Base Styles */
