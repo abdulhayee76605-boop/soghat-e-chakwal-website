@@ -5,8 +5,13 @@ const nextConfig: NextConfig = {
   images: {
     qualities: [75, 100],
   },
-  experimental: {
-    cpus: 1,
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
   },
 };
 
