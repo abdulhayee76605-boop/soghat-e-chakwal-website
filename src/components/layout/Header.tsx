@@ -108,7 +108,7 @@ export function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Order or chat on WhatsApp"
-                className="hidden sm:flex p-2 rounded-full text-[#25D366] hover:bg-green-50 transition-colors"
+                className="flex p-2 rounded-full text-[#25D366] hover:bg-green-50 transition-colors"
                 title="Order on WhatsApp: 0300-8325693"
               >
                 <MessageCircle className="w-5 h-5" />

@@ -490,7 +490,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
       </div>
 
       {/* Sticky Mobile Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-brand-green/10 p-3 px-4 flex items-center justify-between gap-3 shadow-2xl">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-brand-green/10 p-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 shadow-2xl">
         <div>
           <p className="text-[10px] text-brand-charcoal/60 uppercase font-bold">
             {selectedVariant.name}

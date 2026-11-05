@@ -17,7 +17,7 @@ export function WhatsAppButton() {
       initial={{ x: 80, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 2, type: 'spring', damping: 20, stiffness: 200 }}
-      className="fixed bottom-6 right-6 z-40"
+      className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-40"
     >
       {/* Tooltip */}
       <motion.span

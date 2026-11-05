@@ -139,7 +139,7 @@ export default function HeroSection() {
       aria-label="Featured Promotions Slider"
     >
       {/* ── Main Full HD Banner Screen ── */}
-      <div className="relative w-full aspect-[21/9] min-h-[380px] sm:min-h-[460px] md:min-h-[560px] lg:min-h-[640px] max-h-[88vh] bg-stone-900">
+      <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] min-h-[340px] sm:min-h-[460px] md:min-h-[560px] lg:min-h-[640px] max-h-[88vh] bg-stone-900">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeBanner.id}
@@ -165,23 +165,23 @@ export default function HeroSection() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25 pointer-events-none" />
 
             {/* Responsive Interactive Action Overlay */}
-            <div className="absolute bottom-6 sm:bottom-10 right-4 sm:right-12 z-20 flex flex-wrap items-center justify-end gap-2.5 sm:gap-3.5">
+            <div className="absolute bottom-5 sm:bottom-10 right-3 sm:right-12 z-20 flex flex-wrap items-center justify-end gap-2 sm:gap-3.5">
               {activeBanner.primaryCta.isExternal ? (
                 <a
                   href={activeBanner.primaryCta.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white px-5 sm:px-8 py-2.5 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white px-4 sm:px-8 py-2 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
                 >
-                  <activeBanner.primaryCta.icon className="w-4 h-4" />
+                  <activeBanner.primaryCta.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {activeBanner.primaryCta.text} &rarr;
                 </a>
               ) : (
                 <Link
                   href={activeBanner.primaryCta.href}
-                  className="inline-flex items-center gap-2 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-5 sm:px-8 py-2.5 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 sm:px-8 py-2 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
                 >
-                  <activeBanner.primaryCta.icon className="w-4 h-4" />
+                  <activeBanner.primaryCta.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {activeBanner.primaryCta.text} &rarr;
                 </Link>
               )}
@@ -209,17 +209,17 @@ export default function HeroSection() {
           </motion.div>
         </AnimatePresence>
 
-        {/* ── Slide Navigation Arrows ── */}
+        {/* ── Slide Navigation Arrows (Hidden on small touchscreens for clean swipe) ── */}
         <button
           onClick={prevSlide}
-          className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-brand-gold hover:text-brand-charcoal text-white backdrop-blur-md flex items-center justify-center transition-all shadow-xl active:scale-95"
+          className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-brand-gold hover:text-brand-charcoal text-white backdrop-blur-md items-center justify-center transition-all shadow-xl active:scale-95"
           aria-label="Previous Slide"
         >
           <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
         <button
           onClick={nextSlide}
-          className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-brand-gold hover:text-brand-charcoal text-white backdrop-blur-md flex items-center justify-center transition-all shadow-xl active:scale-95"
+          className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-brand-gold hover:text-brand-charcoal text-white backdrop-blur-md items-center justify-center transition-all shadow-xl active:scale-95"
           aria-label="Next Slide"
         >
           <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />

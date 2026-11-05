@@ -197,7 +197,7 @@ export default function CheckoutPage() {
                       type="text"
                       {...register('fullName')}
                       placeholder="e.g. Muhammad Ahmad"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                     {errors.fullName && (
                       <p className="text-xs text-red-600 font-medium">{errors.fullName.message}</p>
@@ -212,7 +212,7 @@ export default function CheckoutPage() {
                       type="tel"
                       {...register('phone')}
                       placeholder="0300 1234567"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                     {errors.phone && (
                       <p className="text-xs text-red-600 font-medium">{errors.phone.message}</p>
@@ -227,7 +227,7 @@ export default function CheckoutPage() {
                       type="tel"
                       {...register('whatsapp')}
                       placeholder="Same as phone or different"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                   </div>
 
@@ -239,7 +239,7 @@ export default function CheckoutPage() {
                       type="email"
                       {...register('email')}
                       placeholder="For tracking updates (optional)"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                     {errors.email && (
                       <p className="text-xs text-red-600 font-medium">{errors.email.message}</p>
@@ -254,7 +254,7 @@ export default function CheckoutPage() {
                       rows={3}
                       {...register('address')}
                       placeholder="House / Flat / Shop #, Street, Mohallah / Sector / Phase"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                     {errors.address && (
                       <p className="text-xs text-red-600 font-medium">{errors.address.message}</p>
@@ -269,7 +269,7 @@ export default function CheckoutPage() {
                       type="text"
                       {...register('city')}
                       placeholder="e.g. Islamabad, Lahore, Chakwal"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                     {errors.city && (
                       <p className="text-xs text-red-600 font-medium">{errors.city.message}</p>
@@ -282,7 +282,7 @@ export default function CheckoutPage() {
                     </label>
                     <select
                       {...register('province')}
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     >
                       {provinces.map((prov) => (
                         <option key={prov} value={prov}>
@@ -303,7 +303,7 @@ export default function CheckoutPage() {
                       type="text"
                       {...register('postalCode')}
                       placeholder="e.g. 44000"
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                   </div>
 
@@ -315,7 +315,7 @@ export default function CheckoutPage() {
                       type="text"
                       {...register('notes')}
                       placeholder="Nearby landmark, delivery timing preference, etc."
-                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-sm bg-brand-ivory/30"
+                      className="w-full px-4 py-3 rounded-xl border border-brand-green/20 focus:outline-none focus:border-brand-gold text-base sm:text-sm bg-brand-ivory/30"
                     />
                   </div>
                 </div>

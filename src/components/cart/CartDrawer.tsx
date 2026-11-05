@@ -200,7 +200,7 @@ export function CartDrawer() {
 
             {/* Footer / Checkout */}
             {items.length > 0 && (
-              <div className="p-5 border-t border-brand-green/10 bg-brand-ivory space-y-3">
+              <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] border-t border-brand-green/10 bg-brand-ivory space-y-3">
                 <div className="space-y-1.5 text-xs text-brand-charcoal/80">
                   <div className="flex justify-between">
                     <span>Subtotal</span>

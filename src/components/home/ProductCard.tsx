@@ -37,16 +37,16 @@ export default function ProductCard({ product }: ProductCardProps) {
       {/* Image area */}
       <Link
         href={`/products/${product.slug}`}
-        className="block aspect-[16/10] sm:aspect-[4/3] relative overflow-hidden bg-amber-50"
+        className="block aspect-[16/11] sm:aspect-[4/3] relative overflow-hidden bg-amber-50/60 p-2 sm:p-3"
       >
         <Image
           src={primaryImage}
           alt={product.name}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover object-left sm:object-center group-hover:scale-105 transition-transform duration-500"
+          className="object-contain object-center group-hover:scale-105 transition-transform duration-500"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         <span className="absolute top-3 left-3 bg-brand-green/90 backdrop-blur-md text-brand-cream text-[11px] font-semibold px-3 py-1 rounded-full shadow-sm">
           {product.category}
         </span>
