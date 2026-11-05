@@ -131,7 +131,7 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative w-full overflow-hidden bg-brand-charcoal pt-20 md:pt-24 select-none"
+      className="relative w-full overflow-hidden bg-brand-charcoal pt-16 sm:pt-20 md:pt-24 select-none"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
@@ -139,7 +139,7 @@ export default function HeroSection() {
       aria-label="Featured Promotions Slider"
     >
       {/* ── Main Full HD Banner Screen ── */}
-      <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] min-h-[340px] sm:min-h-[460px] md:min-h-[560px] lg:min-h-[640px] max-h-[88vh] bg-stone-900">
+      <div className="relative w-full aspect-[2.2/1] sm:aspect-[21/9] min-h-[175px] sm:min-h-[460px] md:min-h-[560px] lg:min-h-[640px] max-h-[88vh] bg-stone-900">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeBanner.id}
@@ -165,23 +165,23 @@ export default function HeroSection() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/25 pointer-events-none" />
 
             {/* Responsive Interactive Action Overlay */}
-            <div className="absolute bottom-5 sm:bottom-10 right-3 sm:right-12 z-20 flex flex-wrap items-center justify-end gap-2 sm:gap-3.5">
+            <div className="absolute bottom-2.5 sm:bottom-10 right-2 sm:right-12 z-20 flex flex-wrap items-center justify-end gap-1.5 sm:gap-3.5">
               {activeBanner.primaryCta.isExternal ? (
                 <a
                   href={activeBanner.primaryCta.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white px-4 sm:px-8 py-2 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-1 sm:gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white px-3 sm:px-8 py-1.5 sm:py-3.5 rounded-full font-bold text-[10px] sm:text-sm tracking-wide shadow-xl transition-all transform hover:scale-105 active:scale-95"
                 >
-                  <activeBanner.primaryCta.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <activeBanner.primaryCta.icon className="w-3 h-3 sm:w-4 sm:h-4" />
                   {activeBanner.primaryCta.text} &rarr;
                 </a>
               ) : (
                 <Link
                   href={activeBanner.primaryCta.href}
-                  className="inline-flex items-center gap-1.5 sm:gap-2 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 sm:px-8 py-2 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm tracking-wide shadow-2xl transition-all transform hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-1 sm:gap-2 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-3 sm:px-8 py-1.5 sm:py-3.5 rounded-full font-bold text-[10px] sm:text-sm tracking-wide shadow-xl transition-all transform hover:scale-105 active:scale-95"
                 >
-                  <activeBanner.primaryCta.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <activeBanner.primaryCta.icon className="w-3 h-3 sm:w-4 sm:h-4" />
                   {activeBanner.primaryCta.text} &rarr;
                 </Link>
               )}
@@ -226,20 +226,20 @@ export default function HeroSection() {
         </button>
 
         {/* ── Slide Dots & Counter ── */}
-        <div className="absolute bottom-4 left-4 sm:left-12 z-30 flex items-center gap-2.5 bg-black/35 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10">
+        <div className="absolute bottom-2 left-2 sm:bottom-4 sm:left-12 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-black/40 backdrop-blur-md px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full border border-white/10">
           {BANNERS.map((banner, idx) => (
             <button
               key={banner.id}
               onClick={() => setCurrentSlide(idx)}
               className={`transition-all duration-300 rounded-full ${
                 currentSlide === idx
-                  ? 'w-7 sm:w-9 h-2 bg-brand-gold shadow-md'
-                  : 'w-2 h-2 bg-white/50 hover:bg-white/90'
+                  ? 'w-5 sm:w-9 h-1.5 sm:h-2 bg-brand-gold shadow-md'
+                  : 'w-1.5 sm:w-2 h-1.5 sm:h-2 bg-white/50 hover:bg-white/90'
               }`}
               aria-label={`Switch to banner ${idx + 1}`}
             />
           ))}
-          <span className="text-[10px] sm:text-xs font-mono font-bold text-white/80 ml-1">
+          <span className="text-[9px] sm:text-xs font-mono font-bold text-white/80 ml-0.5">
             0{currentSlide + 1} / 0{BANNERS.length}
           </span>
         </div>

@@ -52,17 +52,28 @@ export function Header() {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            {/* ── Left Column: Brand Logo ── */}
+          <div className="relative flex items-center justify-between">
+            {/* ── Mobile Left: Drawer Trigger Menu (Mobile only) ── */}
+            <div className="flex items-center lg:hidden z-10">
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                aria-label="Open navigation menu"
+                className="p-2 rounded-xl text-brand-charcoal hover:text-brand-green hover:bg-brand-green/5 transition-colors"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* ── Brand Logo: Centered on Mobile, Left on Desktop ── */}
             <Link
               href="/"
-              className="flex items-center gap-2 group py-0.5 transition-transform duration-300 hover:scale-[1.02]"
+              className="flex items-center gap-2 group py-0.5 transition-transform duration-300 hover:scale-[1.02] absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0 z-10"
               aria-label="Soghat-e-Chakwal Home"
             >
               <BrandLogo size="md" />
             </Link>
 
-            {/* ── Center Column: Desktop Navigation ── */}
+            {/* ── Center Column: Desktop Navigation (Desktop only) ── */}
             <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
@@ -91,7 +102,7 @@ export function Header() {
             </nav>
 
             {/* ── Right Column: Global Action Icons ── */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 z-10">
               {/* Search */}
               <Link
                 href="/shop"
@@ -127,15 +138,6 @@ export function Header() {
                     {itemCount > 99 ? '99+' : itemCount}
                   </span>
                 )}
-              </button>
-
-              {/* Mobile Drawer Trigger */}
-              <button
-                onClick={() => setIsMobileMenuOpen(true)}
-                aria-label="Open navigation menu"
-                className="lg:hidden p-2 rounded-xl text-brand-charcoal hover:text-brand-green hover:bg-brand-green/5 transition-colors"
-              >
-                <Menu className="w-6 h-6" />
               </button>
             </div>
           </div>
