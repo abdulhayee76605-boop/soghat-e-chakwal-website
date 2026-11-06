@@ -11,7 +11,15 @@ declare global {
   }
 }
 
+import { trackFunnelStep } from './analytics';
+
 export function trackEvent(eventName: string, data?: Record<string, any>) {
+  // Sync with live funnel counters
+  if (eventName === 'ViewContent') trackFunnelStep('productViews');
+  if (eventName === 'AddToCart') trackFunnelStep('addToCart');
+  if (eventName === 'InitiateCheckout') trackFunnelStep('checkouts');
+  if (eventName === 'Purchase') trackFunnelStep('orders');
+
   if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
     try {
       if (data) {

@@ -26,6 +26,13 @@ import {
   Sparkles,
   Printer,
   FileText,
+  TrendingUp,
+  Users,
+  Activity,
+  ExternalLink,
+  Tag,
+  BarChart3,
+  MousePointerClick,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
@@ -33,6 +40,8 @@ import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
 import { getStoredOrders, updateStoredOrderStatus, saveNewOrder } from '@/lib/orders-db';
 import { OrderInvoice } from '@/components/admin/OrderInvoice';
+import { getFunnelMetrics, FunnelMetrics } from '@/lib/analytics';
+import { FB_PIXEL_ID } from '@/lib/pixel';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -47,6 +56,8 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+  const [invoiceMode, setInvoiceMode] = useState<'label' | 'invoice'>('label');
+  const [funnel, setFunnel] = useState<FunnelMetrics>(getFunnelMetrics());
 
   // Manual Order Creation State
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
@@ -184,6 +195,7 @@ export default function AdminPage() {
     try {
       const stored = getStoredOrders();
       setOrders(stored);
+      setFunnel(getFunnelMetrics());
     } catch {
       // Fallback
     }
@@ -460,6 +472,143 @@ export default function AdminPage() {
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
+            {/* ── Meta (Facebook) Pixel Live Integration Bar ── */}
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-brand-green text-white rounded-3xl p-6 shadow-md border border-white/10">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      Meta Pixel Live &amp; Connected
+                    </span>
+                    <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                      ID: {FB_PIXEL_ID}
+                    </span>
+                  </div>
+                  <h3 className="font-heading font-bold text-lg text-white">
+                    Facebook Ads Live Event Tracking Active
+                  </h3>
+                  <p className="text-xs text-white/80 max-w-xl leading-relaxed">
+                    Automatically transmitting PageView, ViewContent (Product), AddToCart, InitiateCheckout &amp; Purchase events directly to your Meta Events Manager.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <a
+                    href={`https://business.facebook.com/events_manager2/list/dataset/${FB_PIXEL_ID}/test_events`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95"
+                  >
+                    <Activity className="w-4 h-4" />
+                    Open Meta Events Manager <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                  </a>
+                  <button
+                    onClick={fetchOrders}
+                    className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-colors"
+                  >
+                    Refresh Metrics
+                  </button>
+                </div>
+              </div>
+
+              {/* Event Status Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-white/10 text-center">
+                <div className="bg-white/10 rounded-xl p-2">
+                  <p className="text-[10px] text-white/70 uppercase font-bold">PageView</p>
+                  <p className="font-mono text-base font-bold text-emerald-300 mt-0.5">{funnel.pageViews}</p>
+                </div>
+                <div className="bg-white/10 rounded-xl p-2">
+                  <p className="text-[10px] text-white/70 uppercase font-bold">ViewContent</p>
+                  <p className="font-mono text-base font-bold text-emerald-300 mt-0.5">{funnel.productViews}</p>
+                </div>
+                <div className="bg-white/10 rounded-xl p-2">
+                  <p className="text-[10px] text-white/70 uppercase font-bold">AddToCart</p>
+                  <p className="font-mono text-base font-bold text-amber-300 mt-0.5">{funnel.addToCart}</p>
+                </div>
+                <div className="bg-white/10 rounded-xl p-2">
+                  <p className="text-[10px] text-white/70 uppercase font-bold">InitiateCheckout</p>
+                  <p className="font-mono text-base font-bold text-amber-300 mt-0.5">{funnel.checkouts}</p>
+                </div>
+                <div className="bg-white/10 rounded-xl p-2 col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-white/70 uppercase font-bold">Purchase (Orders)</p>
+                  <p className="font-mono text-base font-bold text-brand-gold mt-0.5">{orders.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Live E-Commerce Conversion Funnel ── */}
+            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-brand-charcoal flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-brand-green" />
+                    Live Customer Conversion Funnel (Sessions to Purchase)
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Real-time count of visitors moving through each stage of your store.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold bg-brand-green/10 text-brand-green px-3 py-1 rounded-full">
+                    Overall Conversion Rate: {((orders.length / Math.max(1, funnel.sessions)) * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Funnel Steps */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
+                {/* 1. Sessions */}
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center relative overflow-hidden">
+                  <div className="w-2 h-full bg-blue-500 absolute left-0 top-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">1. Total Sessions</p>
+                  <p className="font-mono text-2xl font-black text-stone-900 mt-1">{funnel.sessions}</p>
+                  <p className="text-[10px] text-stone-500 mt-1">Store visitors</p>
+                </div>
+
+                {/* 2. Product Views */}
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center relative overflow-hidden">
+                  <div className="w-2 h-full bg-indigo-500 absolute left-0 top-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">2. Product Views</p>
+                  <p className="font-mono text-2xl font-black text-stone-900 mt-1">{funnel.productViews}</p>
+                  <p className="text-[10px] text-stone-500 mt-1">
+                    {((funnel.productViews / Math.max(1, funnel.sessions)) * 100).toFixed(0)}% viewed products
+                  </p>
+                </div>
+
+                {/* 3. Add to Cart */}
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center relative overflow-hidden">
+                  <div className="w-2 h-full bg-amber-500 absolute left-0 top-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">3. Added to Cart</p>
+                  <p className="font-mono text-2xl font-black text-stone-900 mt-1">{funnel.addToCart}</p>
+                  <p className="text-[10px] text-stone-500 mt-1">
+                    {((funnel.addToCart / Math.max(1, funnel.productViews)) * 100).toFixed(0)}% of viewers
+                  </p>
+                </div>
+
+                {/* 4. Checkout */}
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 text-center relative overflow-hidden">
+                  <div className="w-2 h-full bg-orange-500 absolute left-0 top-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">4. Reached Checkout</p>
+                  <p className="font-mono text-2xl font-black text-stone-900 mt-1">{funnel.checkouts}</p>
+                  <p className="text-[10px] text-stone-500 mt-1">
+                    {((funnel.checkouts / Math.max(1, funnel.addToCart)) * 100).toFixed(0)}% proceeded
+                  </p>
+                </div>
+
+                {/* 5. Orders Placed */}
+                <div className="bg-emerald-50/70 border-2 border-emerald-500 rounded-2xl p-4 text-center relative overflow-hidden">
+                  <div className="w-2 h-full bg-emerald-600 absolute left-0 top-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">5. Orders Placed</p>
+                  <p className="font-mono text-2xl font-black text-emerald-950 mt-1">{orders.length}</p>
+                  <p className="text-[10px] text-emerald-700 font-bold mt-1">Completed purchases</p>
+                </div>
+              </div>
+            </div>
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
@@ -531,7 +680,7 @@ export default function AdminPage() {
                         <th className="py-3 px-2">City</th>
                         <th className="py-3 px-2">Total</th>
                         <th className="py-3 px-2">Status</th>
-                        <th className="py-3 px-2 text-right">Invoice</th>
+                        <th className="py-3 px-2 text-right">Dispatch Slips</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -549,14 +698,30 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="py-3 px-2 text-right">
-                            <button
-                              onClick={() => setInvoiceOrder(o)}
-                              className="inline-flex items-center gap-1 text-[11px] bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
-                              title="Print Invoice"
-                            >
-                              <Printer className="w-3 h-3" />
-                              Print
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setInvoiceMode('label');
+                                  setInvoiceOrder(o);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] bg-brand-green/10 hover:bg-brand-green hover:text-white text-brand-green px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
+                                title="Print Parcel Envelope Slip"
+                              >
+                                <Tag className="w-3 h-3" />
+                                📦 Parcel Slip
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setInvoiceMode('invoice');
+                                  setInvoiceOrder(o);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
+                                title="Print Customer Invoice"
+                              >
+                                <Printer className="w-3 h-3" />
+                                Invoice
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -698,14 +863,28 @@ export default function AdminPage() {
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => setSelectedOrder(order)}
-                                className="text-xs bg-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white px-2.5 py-1.5 rounded-lg font-medium transition-colors"
+                                className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-2.5 py-1.5 rounded-lg font-medium transition-colors"
                               >
-                                View Items
+                                Items
                               </button>
                               <button
-                                onClick={() => setInvoiceOrder(order)}
-                                className="flex items-center gap-1 text-xs bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
-                                title="Print / Download Invoice"
+                                onClick={() => {
+                                  setInvoiceMode('label');
+                                  setInvoiceOrder(order);
+                                }}
+                                className="inline-flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title="Print Parcel Shipping Slip"
+                              >
+                                <Tag className="w-3.5 h-3.5" />
+                                📦 Parcel Slip
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setInvoiceMode('invoice');
+                                  setInvoiceOrder(order);
+                                }}
+                                className="inline-flex items-center gap-1 text-xs bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title="Print Detailed Customer Invoice"
                               >
                                 <Printer className="w-3.5 h-3.5" />
                                 Invoice
@@ -767,17 +946,30 @@ export default function AdminPage() {
                       <span className="text-brand-green">{formatPrice(selectedOrder.total)}</span>
                     </div>
 
-                    <div className="pt-4 border-t flex justify-end gap-2">
+                    <div className="pt-4 border-t flex flex-wrap justify-end gap-2">
                       <button
                         onClick={() => {
                           const o = selectedOrder;
                           setSelectedOrder(null);
+                          setInvoiceMode('label');
+                          setInvoiceOrder(o);
+                        }}
+                        className="flex items-center gap-1.5 bg-brand-green text-brand-cream hover:bg-brand-green-light px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                      >
+                        <Tag className="w-4 h-4 text-brand-gold" />
+                        Print Parcel Shipping Slip
+                      </button>
+                      <button
+                        onClick={() => {
+                          const o = selectedOrder;
+                          setSelectedOrder(null);
+                          setInvoiceMode('invoice');
                           setInvoiceOrder(o);
                         }}
                         className="flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
                       >
                         <Printer className="w-4 h-4" />
-                        Print Official Invoice
+                        Print Tax Invoice
                       </button>
                     </div>
                   </div>
@@ -1249,6 +1441,7 @@ export default function AdminPage() {
           <OrderInvoice
             order={invoiceOrder}
             onClose={() => setInvoiceOrder(null)}
+            defaultMode={invoiceMode}
           />
         )}
       </main>

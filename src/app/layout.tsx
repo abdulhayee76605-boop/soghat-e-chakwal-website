@@ -8,6 +8,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { WhatsAppButton } from '@/components/layout/WhatsAppButton';
 import { CartDrawer } from '@/components/cart/CartDrawer';
+import { AnalyticsTracker } from '@/components/analytics/AnalyticsTracker';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -82,6 +83,7 @@ export default function RootLayout({
         </noscript>
 
         <Header />
+        <AnalyticsTracker />
         <main className="flex-1">{children}</main>
         <Footer />
         <WhatsAppButton />
