@@ -24,12 +24,15 @@ import {
   Banknote,
   Search,
   Sparkles,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
-import { getStoredOrders, updateStoredOrderStatus } from '@/lib/orders-db';
+import { getStoredOrders, updateStoredOrderStatus, saveNewOrder } from '@/lib/orders-db';
+import { OrderInvoice } from '@/components/admin/OrderInvoice';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -43,6 +46,17 @@ export default function AdminPage() {
   const [productList, setProductList] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
+
+  // Manual Order Creation State
+  const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualCity, setManualCity] = useState('Chakwal');
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualProductChoice, setManualProductChoice] = useState<'1l' | '500ml'>('1l');
+  const [manualQty, setManualQty] = useState(1);
+  const [manualPayment, setManualPayment] = useState<'cod' | 'bank_transfer'>('cod');
 
   // Form states
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -55,6 +69,109 @@ export default function AdminPage() {
   const [shippingRate, setShippingRate] = useState(siteConfig.shippingCharge);
   const [freeShippingMin, setFreeShippingMin] = useState(siteConfig.freeShippingThreshold || 2000);
   const [savedSettings, setSavedSettings] = useState(false);
+
+  // Load orders & persistent products
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedProds = localStorage.getItem('sec_products');
+        if (storedProds) {
+          setProductList(JSON.parse(storedProds));
+        }
+      } catch {}
+    }
+  }, []);
+
+  const saveProductList = (updated: Product[]) => {
+    setProductList(updated);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('sec_products', JSON.stringify(updated));
+      } catch {}
+    }
+  };
+
+  const updateStockQuantity = (productId: string, variantId: string, delta: number) => {
+    const updated = productList.map((p) => {
+      if (p.id === productId) {
+        return {
+          ...p,
+          variants: p.variants.map((v) => {
+            if (v.id === variantId) {
+              const currentStock = v.stockQuantity ?? 30;
+              const newQty = Math.max(0, currentStock + delta);
+              return { ...v, stockQuantity: newQty, inStock: newQty > 0 };
+            }
+            return v;
+          }),
+        };
+      }
+      return p;
+    });
+    saveProductList(updated);
+  };
+
+  const toggleStockStatus = (productId: string, variantId: string) => {
+    const updated = productList.map((p) => {
+      if (p.id === productId) {
+        return {
+          ...p,
+          variants: p.variants.map((v) => {
+            if (v.id === variantId) {
+              return { ...v, inStock: !v.inStock };
+            }
+            return v;
+          }),
+        };
+      }
+      return p;
+    });
+    saveProductList(updated);
+  };
+
+  const handleCreateManualOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    const is1L = manualProductChoice === '1l';
+    const unitPrice = is1L ? 750 : 450;
+    const subtotal = unitPrice * manualQty;
+    const shipping = subtotal >= freeShippingMin ? 0 : shippingRate;
+    const total = subtotal + shipping;
+
+    const prod = productList[is1L ? 0 : 1] || initialProducts[0];
+    const variant = prod.variants[is1L ? 0 : 1] || prod.variants[0];
+
+    const newOrder = saveNewOrder({
+      items: [
+        {
+          productId: prod.id,
+          variantId: variant.id,
+          quantity: manualQty,
+          product: prod,
+          variant: variant,
+        },
+      ],
+      customer: {
+        fullName: manualName,
+        phone: manualPhone,
+        whatsapp: manualPhone,
+        address: manualAddress,
+        city: manualCity,
+        province: 'Punjab',
+      },
+      paymentMethod: manualPayment,
+      subtotal,
+      shipping,
+      total,
+    });
+
+    setOrders((prev) => [newOrder, ...prev]);
+    setShowAddOrderModal(false);
+    setManualName('');
+    setManualPhone('');
+    setManualAddress('');
+    // Automatically open invoice for immediate printing
+    setInvoiceOrder(newOrder);
+  };
 
   // Load orders from API
   useEffect(() => {
@@ -163,13 +280,13 @@ export default function AdminPage() {
       tags: ['traditional', 'chakwal'],
     };
 
-    setProductList([newProd, ...productList]);
+    saveProductList([newProd, ...productList]);
     setShowAddProduct(false);
     setNewProductName('');
   };
 
   const deleteProduct = (id: string) => {
-    setProductList(productList.filter((p) => p.id !== id));
+    saveProductList(productList.filter((p) => p.id !== id));
   };
 
   // Analytics
@@ -414,6 +531,7 @@ export default function AdminPage() {
                         <th className="py-3 px-2">City</th>
                         <th className="py-3 px-2">Total</th>
                         <th className="py-3 px-2">Status</th>
+                        <th className="py-3 px-2 text-right">Invoice</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -430,6 +548,16 @@ export default function AdminPage() {
                               {o.status}
                             </span>
                           </td>
+                          <td className="py-3 px-2 text-right">
+                            <button
+                              onClick={() => setInvoiceOrder(o)}
+                              className="inline-flex items-center gap-1 text-[11px] bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
+                              title="Print Invoice"
+                            >
+                              <Printer className="w-3 h-3" />
+                              Print
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -444,16 +572,30 @@ export default function AdminPage() {
         {activeTab === 'orders' && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="font-heading font-bold text-lg text-brand-charcoal">
-                  All Customer Orders ({orders.length})
-                </h3>
-                <button
-                  onClick={fetchOrders}
-                  className="text-xs bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-lg font-medium transition-colors"
-                >
-                  Refresh Orders
-                </button>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h3 className="font-heading font-bold text-lg text-brand-charcoal">
+                    All Customer Orders ({orders.length})
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Track statuses, customer addresses, and generate dispatch invoices.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => setShowAddOrderModal(true)}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-brand-green text-brand-cream hover:bg-brand-green-light px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                  >
+                    <Plus className="w-4 h-4 text-brand-gold" />
+                    + New WhatsApp / Phone Order
+                  </button>
+                  <button
+                    onClick={fetchOrders}
+                    className="text-xs bg-stone-100 hover:bg-stone-200 px-3 py-2 rounded-xl font-medium transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
               </div>
 
               {orders.length === 0 ? (
@@ -553,12 +695,22 @@ export default function AdminPage() {
                           </td>
 
                           <td className="py-4 px-3">
-                            <button
-                              onClick={() => setSelectedOrder(order)}
-                              className="text-xs bg-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white px-2.5 py-1 rounded-md font-medium transition-colors"
-                            >
-                              View Items
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setSelectedOrder(order)}
+                                className="text-xs bg-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white px-2.5 py-1.5 rounded-lg font-medium transition-colors"
+                              >
+                                View Items
+                              </button>
+                              <button
+                                onClick={() => setInvoiceOrder(order)}
+                                className="flex items-center gap-1 text-xs bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title="Print / Download Invoice"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                Invoice
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -613,6 +765,20 @@ export default function AdminPage() {
                     <div className="pt-2 border-t flex justify-between font-bold text-sm">
                       <span>Total Amount:</span>
                       <span className="text-brand-green">{formatPrice(selectedOrder.total)}</span>
+                    </div>
+
+                    <div className="pt-4 border-t flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          const o = selectedOrder;
+                          setSelectedOrder(null);
+                          setInvoiceOrder(o);
+                        }}
+                        className="flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Print Official Invoice
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -721,37 +887,102 @@ export default function AdminPage() {
                   <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider">
                     <th className="py-3 px-3">Product Name</th>
                     <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3">Variants &amp; Pricing</th>
-                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3">Variants, Pricing &amp; Stock Count</th>
+                    <th className="py-3 px-3">Inventory Status</th>
                     <th className="py-3 px-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {productList.map((prod) => (
                     <tr key={prod.id} className="hover:bg-stone-50">
-                      <td className="py-4 px-3 font-semibold text-stone-800">
-                        {prod.name}
-                      </td>
-                      <td className="py-4 px-3 text-stone-600">{prod.category}</td>
                       <td className="py-4 px-3">
+                        <p className="font-bold text-stone-900 text-sm">{prod.name}</p>
+                        {prod.nameUrdu && (
+                          <p className="font-serif text-brand-gold text-xs">{prod.nameUrdu}</p>
+                        )}
+                        <p className="text-[10px] text-stone-400 font-mono mt-0.5">ID: {prod.id}</p>
+                      </td>
+                      <td className="py-4 px-3">
+                        <span className="bg-stone-100 text-stone-700 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                          {prod.category}
+                        </span>
+                      </td>
+                      <td className="py-4 px-3 space-y-2">
                         {prod.variants.map((v) => (
-                          <span
+                          <div
                             key={v.id}
-                            className="inline-block bg-brand-cream text-brand-charcoal border border-brand-gold/30 px-2 py-0.5 rounded text-[10px] font-bold mr-1.5"
+                            className="flex flex-wrap items-center gap-2 bg-stone-50 p-2 rounded-xl border border-stone-200"
                           >
-                            {v.name}: {formatPrice(v.price)}
-                          </span>
+                            <span className="font-bold text-stone-800 text-[11px] min-w-[70px]">
+                              {v.name}:
+                            </span>
+                            <span className="font-mono text-brand-green font-bold text-xs">
+                              {formatPrice(v.price)}
+                            </span>
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              <span className="text-[10px] text-stone-500">Stock:</span>
+                              <div className="inline-flex items-center border border-stone-300 rounded-lg overflow-hidden bg-white shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => updateStockQuantity(prod.id, v.id, -5)}
+                                  className="px-2 py-0.5 hover:bg-stone-100 text-stone-600 font-bold border-r text-[10px]"
+                                  title="Reduce stock by 5"
+                                >
+                                  -5
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateStockQuantity(prod.id, v.id, -1)}
+                                  className="px-2 py-0.5 hover:bg-stone-100 text-stone-600 font-bold border-r text-xs"
+                                  title="Reduce stock by 1"
+                                >
+                                  -
+                                </button>
+                                <span className="px-2.5 py-0.5 font-mono font-bold text-xs text-brand-charcoal min-w-[32px] text-center">
+                                  {v.stockQuantity ?? 30}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateStockQuantity(prod.id, v.id, 1)}
+                                  className="px-2 py-0.5 hover:bg-stone-100 text-stone-600 font-bold border-l text-xs"
+                                  title="Increase stock by 1"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateStockQuantity(prod.id, v.id, 10)}
+                                  className="px-2 py-0.5 hover:bg-stone-100 text-stone-600 font-bold border-l text-[10px]"
+                                  title="Add 10 more bottles"
+                                >
+                                  +10
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleStockStatus(prod.id, v.id)}
+                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-colors ${
+                                  v.inStock !== false && (v.stockQuantity ?? 30) > 0
+                                    ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                    : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                }`}
+                              >
+                                {v.inStock !== false && (v.stockQuantity ?? 30) > 0 ? 'In Stock' : 'Out of Stock'}
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </td>
                       <td className="py-4 px-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                          Active
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                          Live in Store
                         </span>
                       </td>
                       <td className="py-4 px-3">
                         <button
                           onClick={() => deleteProduct(prod.id)}
-                          className="text-stone-400 hover:text-red-600 transition-colors"
+                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete product"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -875,6 +1106,150 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* ── Manual Order Modal ── */}
+        {showAddOrderModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-4 shadow-2xl border border-stone-200">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h4 className="font-heading font-bold text-lg text-brand-green flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-brand-gold" />
+                  Create Manual / WhatsApp Order
+                </h4>
+                <button
+                  onClick={() => setShowAddOrderModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-sm font-bold"
+                >
+                  &times; Close
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateManualOrder} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Customer Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={manualName}
+                    onChange={(e) => setManualName(e.target.value)}
+                    placeholder="e.g. Usman Tariq"
+                    className="w-full px-3.5 py-2.5 border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Phone / WhatsApp *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      placeholder="0300 1234567"
+                      className="w-full px-3.5 py-2.5 border rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">City *</label>
+                    <input
+                      type="text"
+                      required
+                      value={manualCity}
+                      onChange={(e) => setManualCity(e.target.value)}
+                      placeholder="e.g. Chakwal, Rawalpindi"
+                      className="w-full px-3.5 py-2.5 border rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Complete Delivery Address *</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={manualAddress}
+                    onChange={(e) => setManualAddress(e.target.value)}
+                    placeholder="House / Shop #, Street, Mohallah / Sector"
+                    className="w-full px-3.5 py-2.5 border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Product Variant</label>
+                    <select
+                      value={manualProductChoice}
+                      onChange={(e) => setManualProductChoice(e.target.value as '1l' | '500ml')}
+                      className="w-full px-3.5 py-2.5 border rounded-xl bg-white"
+                    >
+                      <option value="1l">1 Liter Bottle (Rs. 750)</option>
+                      <option value="500ml">500ml Bottle (Rs. 450)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Quantity</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={manualQty}
+                      onChange={(e) => setManualQty(Number(e.target.value) || 1)}
+                      className="w-full px-3.5 py-2.5 border rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Payment Method</label>
+                  <select
+                    value={manualPayment}
+                    onChange={(e) => setManualPayment(e.target.value as 'cod' | 'bank_transfer')}
+                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white"
+                  >
+                    <option value="cod">Cash on Delivery (COD)</option>
+                    <option value="bank_transfer">Direct Bank Transfer</option>
+                  </select>
+                </div>
+
+                <div className="bg-brand-ivory p-3.5 rounded-xl border border-brand-green/10 flex justify-between items-center text-xs">
+                  <span className="font-semibold text-stone-700">Total Payable (with Shipping):</span>
+                  <span className="font-black font-mono text-base text-brand-green">
+                    {formatPrice(
+                      (manualProductChoice === '1l' ? 750 : 450) * manualQty +
+                        ((manualProductChoice === '1l' ? 750 : 450) * manualQty >= freeShippingMin
+                          ? 0
+                          : shippingRate)
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light transition-all shadow-sm"
+                  >
+                    Save &amp; Generate Invoice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddOrderModal(false)}
+                    className="bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Official Printable / Downloadable Invoice Modal ── */}
+        {invoiceOrder && (
+          <OrderInvoice
+            order={invoiceOrder}
+            onClose={() => setInvoiceOrder(null)}
+          />
         )}
       </main>
     </div>
