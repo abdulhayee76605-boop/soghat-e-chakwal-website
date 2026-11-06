@@ -26,6 +26,7 @@ import { formatPrice } from '@/lib/utils';
 import { generateWhatsAppMessage, getWhatsAppUrl } from '@/lib/whatsapp';
 import { saveNewOrder } from '@/lib/orders-db';
 import { trackEvent } from '@/lib/pixel';
+import { triggerNotificationDispatch } from '@/lib/notifications';
 
 const checkoutSchema = z.object({
   fullName: z.string().min(3, 'Full name must be at least 3 characters'),
@@ -143,6 +144,9 @@ export default function CheckoutPage() {
         shipping,
         total,
       });
+
+      // Send automated multi-channel notifications (Email, SMS & WhatsApp)
+      triggerNotificationDispatch(newOrder, 'order_placed').catch(() => {});
 
       // Clear cart and redirect to order confirmation
       clearCart();

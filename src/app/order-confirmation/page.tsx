@@ -63,6 +63,9 @@ function ConfirmationContent() {
         <p className="text-[11px] text-brand-terracotta mt-1">
           Save this number for tracking and communication.
         </p>
+        <div className="mt-2.5 pt-2 border-t border-brand-gold/30 text-[11px] text-brand-green font-semibold flex items-center justify-center gap-1.5">
+          <span>📧 Automated Email &amp; 📱 SMS notification dispatched</span>
+        </div>
       </div>
 
       {/* Next Steps Timeline */}

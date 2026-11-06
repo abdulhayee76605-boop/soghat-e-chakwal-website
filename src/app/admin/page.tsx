@@ -39,6 +39,10 @@ import {
   Copy,
   FileDown,
   AlertTriangle,
+  MessageCircle,
+  Send,
+  Bell,
+  Mail,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
@@ -56,6 +60,7 @@ import {
 import { OrderInvoice } from '@/components/admin/OrderInvoice';
 import { getFunnelMetrics, fetchServerFunnel, resetFunnelMetrics, FunnelMetrics } from '@/lib/analytics';
 import { FB_PIXEL_ID } from '@/lib/pixel';
+import { triggerNotificationDispatch, getCustomerWhatsAppUrl } from '@/lib/notifications';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -98,7 +103,38 @@ export default function AdminPage() {
   // Diagnostic & Toast States
   const [pixelStatus, setPixelStatus] = useState<'testing' | 'active' | 'blocked' | null>(null);
   const [resetToast, setResetToast] = useState(false);
+  const [notificationToast, setNotificationToast] = useState<string | null>(null);
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
+  // Notification Test States
+  const [testNotifEmail, setTestNotifEmail] = useState('');
+  const [testNotifPhone, setTestNotifPhone] = useState('03001234567');
+  const [testNotifStatus, setTestNotifStatus] = useState<string | null>(null);
+  const [testNotifLoading, setTestNotifLoading] = useState(false);
+
+  const handleSendTestNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTestNotifLoading(true);
+    setTestNotifStatus(null);
+    try {
+      const sample = getSamplePreviewOrder();
+      sample.customer.email = testNotifEmail || undefined;
+      sample.customer.phone = testNotifPhone;
+      sample.customer.whatsapp = testNotifPhone;
+
+      const res = await triggerNotificationDispatch(sample, 'confirmed');
+      if (res && res.success) {
+        const logs = res.results?.logs?.join(' | ') || 'Dispatched';
+        setTestNotifStatus(`Test dispatched: ${logs}`);
+      } else {
+        setTestNotifStatus(`Result: ${res?.error || 'Dispatched test'}`);
+      }
+    } catch {
+      setTestNotifStatus('Test notification request finished');
+    } finally {
+      setTestNotifLoading(false);
+    }
+  };
 
   const handleTestPixel = () => {
     if (typeof window !== 'undefined' && typeof (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq === 'function') {
@@ -145,7 +181,7 @@ Phone: ${order.customer.phone}
 Address: ${order.customer.address}
 City: ${order.customer.city.toUpperCase()}
 Amount: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (Cash on Delivery)` : 'Rs. 0 (Already Paid)'}
-Return: Soghat-e-Chakwal, 0300-8325693
+Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (0300-8325693)
 =============================`;
     navigator.clipboard.writeText(text);
     setCopiedOrderId(order.id);
@@ -260,6 +296,12 @@ Return: Soghat-e-Chakwal, 0300-8325693
     setManualName('');
     setManualPhone('');
     setManualAddress('');
+    
+    // Automatically trigger notification (Email, SMS & WhatsApp)
+    triggerNotificationDispatch(newOrder, 'order_placed').catch(() => {});
+    setNotificationToast(`Order created & notification sent to ${newOrder.customer.fullName}`);
+    setTimeout(() => setNotificationToast(null), 3500);
+
     // Automatically open invoice for immediate printing
     setInvoiceOrder(newOrder);
   };
@@ -306,6 +348,15 @@ Return: Soghat-e-Chakwal, 0300-8325693
       );
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status } : null));
+      }
+
+      // Automatically dispatch customer status notification (Email, SMS & WhatsApp)
+      const targetOrder = orders.find((o) => o.id === orderId);
+      if (targetOrder) {
+        const updated = { ...targetOrder, status };
+        triggerNotificationDispatch(updated, status).catch(() => {});
+        setNotificationToast(`Notification sent to ${targetOrder.customer.fullName} for status: ${status.toUpperCase()}`);
+        setTimeout(() => setNotificationToast(null), 3500);
       }
     } catch {
       // Ignore
@@ -581,6 +632,14 @@ Return: Soghat-e-Chakwal, 0300-8325693
           </div>
         )}
 
+        {/* Customer Notification Dispatch Toast */}
+        {notificationToast && (
+          <div className="fixed top-6 right-6 z-50 bg-brand-green text-brand-cream border border-brand-gold/40 px-5 py-3.5 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2.5 animate-in slide-in-from-top-2 duration-300">
+            <Bell className="w-4 h-4 text-brand-gold animate-wiggle" />
+            <span>🔔 {notificationToast}</span>
+          </div>
+        )}
+
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -851,6 +910,16 @@ Return: Soghat-e-Chakwal, 0300-8325693
                           </td>
                           <td className="py-3 px-2 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <a
+                                href={getCustomerWhatsAppUrl(o, o.status)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] bg-green-50 hover:bg-[#25D366] hover:text-white text-green-700 border border-green-200 px-2 py-1 rounded-md font-bold transition-all shadow-2xs"
+                                title={`Send WhatsApp "${o.status.toUpperCase()}" update to ${o.customer.fullName}`}
+                              >
+                                <MessageCircle className="w-3 h-3 text-[#25D366]" />
+                                WhatsApp Update
+                              </a>
                               <button
                                 onClick={() => handleCopyOrderCourierText(o)}
                                 className="inline-flex items-center gap-1 text-[11px] bg-stone-100 hover:bg-stone-200 text-stone-700 px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
@@ -1052,6 +1121,16 @@ Return: Soghat-e-Chakwal, 0300-8325693
 
                           <td className="py-4 px-3">
                             <div className="flex items-center gap-1.5">
+                              <a
+                                href={getCustomerWhatsAppUrl(order, order.status)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs bg-green-50 hover:bg-[#25D366] hover:text-white text-green-700 border border-green-200 px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title={`Send WhatsApp "${order.status.toUpperCase()}" update to ${order.customer.fullName}`}
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                                WhatsApp Update
+                              </a>
                               <button
                                 onClick={() => handleCopyOrderCourierText(order)}
                                 className="inline-flex items-center gap-1 text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-2 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
@@ -1470,6 +1549,15 @@ Return: Soghat-e-Chakwal, 0300-8325693
               </div>
 
               <div className="space-y-1">
+                <label className="font-bold text-stone-700">Official Shipper Return Address (Printed on Parcel Slips)</label>
+                <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-stone-700 space-y-0.5">
+                  <p className="font-bold text-brand-green">Soghat-e-Chakwal Main Hub</p>
+                  <p className="text-[11px]">Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad, Pakistan</p>
+                  <p className="text-[11px] font-mono text-stone-600">Helpline: +92 300 8325693</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
                 <label className="font-bold text-stone-700">Official WhatsApp Business Number</label>
                 <input
                   type="text"
@@ -1477,6 +1565,107 @@ Return: Soghat-e-Chakwal, 0300-8325693
                   className="w-full px-4 py-2.5 border rounded-xl bg-stone-50"
                   readOnly
                 />
+              </div>
+
+              {/* ── Notification APIs & Automated Messaging Setup ── */}
+              <div className="border-t border-stone-200 pt-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-brand-gold" />
+                  <h4 className="font-heading font-bold text-sm text-brand-charcoal">
+                    Automated Customer Notifications (Email, WhatsApp &amp; SMS)
+                  </h4>
+                </div>
+                <p className="text-[11px] text-stone-500 leading-relaxed">
+                  Jab koi customer order place kare ya aap admin panel mein status (Confirmed &rarr; Shipped &rarr; Delivered) tabdeel karein, to customer ko automated messages bhejnay ka nizam yahan se control hota hai:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Email Channel */}
+                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-brand-green font-bold text-xs">
+                      <Mail className="w-3.5 h-3.5 text-brand-gold" />
+                      1. Auto Email (Resend)
+                    </div>
+                    <p className="text-[10px] text-stone-500">
+                      Branded HTML receipt bill. Free 3,000 emails/month at <strong>resend.com</strong>.
+                    </p>
+                    <p className="font-mono text-[9px] bg-white p-1 rounded border text-stone-700">
+                      RESEND_API_KEY
+                    </p>
+                  </div>
+
+                  {/* SMS Channel */}
+                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-brand-green font-bold text-xs">
+                      <Send className="w-3.5 h-3.5 text-brand-gold" />
+                      2. Auto SMS (Phone)
+                    </div>
+                    <p className="text-[10px] text-stone-500">
+                      Pakistani mobile SMS (Twilio or SendPK / BrandSMS gateway API).
+                    </p>
+                    <p className="font-mono text-[9px] bg-white p-1 rounded border text-stone-700">
+                      TWILIO_ACCOUNT_SID
+                    </p>
+                  </div>
+
+                  {/* WhatsApp Channel */}
+                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-brand-green font-bold text-xs">
+                      <MessageCircle className="w-3.5 h-3.5 text-[#25D366]" />
+                      3. WhatsApp Update
+                    </div>
+                    <p className="text-[10px] text-stone-500">
+                      UltraMsg API for background auto-send, ya 1-Click WhatsApp button in Orders table.
+                    </p>
+                    <p className="font-mono text-[9px] bg-white p-1 rounded border text-stone-700">
+                      ULTRAMSG_TOKEN
+                    </p>
+                  </div>
+                </div>
+
+                {/* Interactive Test Notification Form */}
+                <form onSubmit={handleSendTestNotification} className="bg-brand-ivory/60 p-4 rounded-2xl border border-brand-green/10 space-y-3">
+                  <p className="font-bold text-stone-800 text-[11px] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
+                    Send Test Customer Notification (Dispatch Test)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[10px] text-stone-600 block mb-0.5">Test Recipient Email:</label>
+                      <input
+                        type="email"
+                        value={testNotifEmail}
+                        onChange={(e) => setTestNotifEmail(e.target.value)}
+                        placeholder="yourname@gmail.com"
+                        className="w-full px-3 py-1.5 bg-white border rounded-lg text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-stone-600 block mb-0.5">Test Recipient Phone / WhatsApp:</label>
+                      <input
+                        type="text"
+                        value={testNotifPhone}
+                        onChange={(e) => setTestNotifPhone(e.target.value)}
+                        placeholder="03001234567"
+                        className="w-full px-3 py-1.5 bg-white border rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={testNotifLoading}
+                      className="bg-brand-green hover:bg-brand-green-light text-brand-cream px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50"
+                    >
+                      {testNotifLoading ? 'Dispatching Test...' : 'Send Test Notification'}
+                    </button>
+                    {testNotifStatus && (
+                      <span className="text-[10px] font-semibold text-brand-green">
+                        {testNotifStatus}
+                      </span>
+                    )}
+                  </div>
+                </form>
               </div>
 
               <div className="space-y-1">

@@ -77,9 +77,10 @@ ${itemsList}
 PAYMENT (COD):
 Amount to Collect: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (Cash on Delivery)` : 'Rs. 0 (Already Paid)'}
 
-RETURN TO:
-Soghat-e-Chakwal, Chakwal, Punjab
-Helpline: 0300-8325693
+RETURN TO (SENDER):
+Soghat-e-Chakwal
+Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad, Pakistan
+Helpline / WhatsApp: 0300-8325693
 =============================`;
 
     navigator.clipboard.writeText(text);
@@ -115,8 +116,8 @@ Amount: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (
 
 SENDER (RETURN ADDRESS):
 -------------------------------------------
-Soghat-e-Chakwal Main Facility
-Chakwal, Punjab, Pakistan
+Soghat-e-Chakwal
+Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad, Pakistan
 Helpline / WhatsApp: 0300-8325693
 ===========================================`;
 
@@ -426,9 +427,11 @@ Helpline / WhatsApp: 0300-8325693
                 {/* Shipper Return Address */}
                 <div className="bg-stone-100 p-3 rounded-xl border border-stone-300 text-xs">
                   <p className="text-[10px] font-bold uppercase text-stone-500">If Undelivered, Return To (Sender):</p>
-                  <p className="font-bold text-brand-green">Soghat-e-Chakwal Main Facility</p>
-                  <p className="text-stone-600 text-[11px]">Chakwal, Punjab, Pakistan</p>
-                  <p className="text-stone-800 font-mono text-[11px] font-bold mt-0.5">Helpline: 0300-8325693</p>
+                  <p className="font-bold text-brand-green">Soghat-e-Chakwal</p>
+                  <p className="text-stone-700 font-medium text-[11px] leading-snug mt-0.5">
+                    Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad, Pakistan
+                  </p>
+                  <p className="text-stone-900 font-mono text-[11px] font-bold mt-1">Helpline / WhatsApp: 0300-8325693</p>
                 </div>
               </div>
 
@@ -463,12 +466,12 @@ Helpline / WhatsApp: 0300-8325693
                   <p className="text-xs text-stone-600 mt-2 font-medium">
                     100% Pure Mustard Oil &amp; Traditional Desi Specialties
                   </p>
-                  <p className="text-[11px] text-stone-500 flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3 h-3 text-stone-400" />
-                    Chakwal, Punjab, Pakistan
+                  <p className="text-[11px] text-stone-600 flex items-center gap-1 mt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-brand-gold flex-shrink-0" />
+                    Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad, Pakistan
                   </p>
-                  <p className="text-[11px] text-stone-500 flex items-center gap-1">
-                    <Phone className="w-3 h-3 text-stone-400" />
+                  <p className="text-[11px] text-stone-600 flex items-center gap-1 mt-0.5">
+                    <Phone className="w-3.5 h-3.5 text-brand-gold flex-shrink-0" />
                     Helpline &amp; WhatsApp: +92 300 8325693
                   </p>
                 </div>
