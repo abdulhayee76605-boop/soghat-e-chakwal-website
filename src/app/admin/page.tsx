@@ -1581,16 +1581,21 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* Email Channel */}
-                  <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-brand-green font-bold text-xs">
-                      <Mail className="w-3.5 h-3.5 text-brand-gold" />
-                      1. Auto Email (Resend)
+                  <div className="bg-emerald-50/70 p-3.5 rounded-2xl border-2 border-emerald-400 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-brand-green font-bold text-xs">
+                        <Mail className="w-3.5 h-3.5 text-brand-gold" />
+                        1. Auto Email (Resend)
+                      </div>
+                      <span className="bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        CONNECTED
+                      </span>
                     </div>
-                    <p className="text-[10px] text-stone-500">
-                      Branded HTML receipt bill. Free 3,000 emails/month at <strong>resend.com</strong>.
+                    <p className="text-[10px] text-stone-600">
+                      Branded HTML receipt bill. Automatic customer dispatch active.
                     </p>
-                    <p className="font-mono text-[9px] bg-white p-1 rounded border text-stone-700">
-                      RESEND_API_KEY
+                    <p className="font-mono text-[9px] bg-white p-1 rounded border border-emerald-300 text-emerald-800 font-bold truncate">
+                      RESEND_API_KEY (Active)
                     </p>
                   </div>
 

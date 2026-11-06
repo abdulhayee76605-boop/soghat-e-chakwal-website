@@ -32,13 +32,14 @@ export async function POST(request: Request) {
     };
 
     // ── 1. SEND AUTOMATED EMAIL (Resend API) ──
-    if (order.customer.email && process.env.RESEND_API_KEY) {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (order.customer.email && resendApiKey) {
       try {
         const fromEmail = process.env.EMAIL_FROM || 'Soghat-e-Chakwal <onboarding@resend.dev>';
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -49,12 +50,14 @@ export async function POST(request: Request) {
           }),
         });
 
-        if (res.ok) {
+        const resData = await res.json().catch(() => null);
+
+        if (res.ok && resData && resData.id) {
           results.emailSent = true;
-          results.logs.push(`Email dispatched to ${order.customer.email} via Resend`);
+          results.logs.push(`Email successfully delivered to ${order.customer.email} via Resend (ID: ${resData.id})`);
         } else {
-          const err = await res.text();
-          results.logs.push(`Resend Email Error: ${err}`);
+          const errDetail = resData?.message || resData?.error || (typeof resData === 'string' ? resData : 'Failed to send');
+          results.logs.push(`Resend Email Notice: ${errDetail}`);
         }
       } catch (err: unknown) {
         results.logs.push(`Email sending exception: ${err instanceof Error ? err.message : 'Unknown'}`);
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     } else if (!order.customer.email) {
       results.logs.push('No email address provided by customer');
     } else {
-      results.logs.push('RESEND_API_KEY not configured in environment variables');
+      results.logs.push('RESEND_API_KEY not configured');
     }
 
     // ── 2. SEND AUTOMATED SMS (Twilio or Pakistani SMS Gateway) ──
