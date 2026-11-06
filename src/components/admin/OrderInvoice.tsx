@@ -21,6 +21,8 @@ import {
   Tag,
   Download,
   Check,
+  Copy,
+  FileDown,
 } from 'lucide-react';
 import { Order } from '@/lib/types';
 import { formatPrice } from '@/lib/utils';
@@ -35,10 +37,100 @@ interface OrderInvoiceProps {
 export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInvoiceProps) {
   const [viewMode, setViewMode] = useState<'label' | 'invoice'>(defaultMode);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
+
+  const formattedDate = new Date(order.createdAt).toLocaleDateString('en-PK', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+
+  const formattedTime = new Date(order.createdAt).toLocaleTimeString('en-PK', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCopyCourierText = () => {
+    const itemsList = order.items
+      .map((i) => `${i.product.name} (${i.variant.name}) x ${i.quantity}`)
+      .join(', ');
+    const text = `=============================
+📦 SOGHAT-E-CHAKWAL PARCEL SLIP
+=============================
+Order ID: ${order.orderNumber}
+Date: ${formattedDate}
+
+DELIVER TO (CUSTOMER):
+Name: ${order.customer.fullName}
+Phone: ${order.customer.phone}
+${order.customer.whatsapp ? `WhatsApp: ${order.customer.whatsapp}\n` : ''}Address: ${order.customer.address}
+City: ${order.customer.city.toUpperCase()}, ${order.customer.province}
+${order.notes ? `Landmark Note: ${order.notes}\n` : ''}
+PACKAGE CONTENTS:
+${itemsList}
+
+PAYMENT (COD):
+Amount to Collect: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (Cash on Delivery)` : 'Rs. 0 (Already Paid)'}
+
+RETURN TO:
+Soghat-e-Chakwal, Chakwal, Punjab
+Helpline: 0300-8325693
+=============================`;
+
+    navigator.clipboard.writeText(text);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 3000);
+  };
+
+  const handleDownloadTextSlip = () => {
+    const itemsList = order.items
+      .map((i) => `• ${i.product.name} (${i.variant.name}) x ${i.quantity}`)
+      .join('\n');
+    const text = `===========================================
+📦 SOGHAT-E-CHAKWAL — PARCEL DISPATCH SLIP
+===========================================
+Order ID: ${order.orderNumber}
+Date: ${formattedDate} (${formattedTime})
+
+CONSIGNEE / DELIVER TO:
+-------------------------------------------
+Name: ${order.customer.fullName}
+Phone: ${order.customer.phone}
+${order.customer.whatsapp ? `WhatsApp: ${order.customer.whatsapp}\n` : ''}Address: ${order.customer.address}
+City: ${order.customer.city.toUpperCase()} (${order.customer.province})
+${order.notes ? `Landmark Note: ${order.notes}\n` : ''}
+PARCEL CONTENTS:
+-------------------------------------------
+${itemsList}
+Total Amount: Rs. ${order.total}
+
+COD CASH TO COLLECT:
+-------------------------------------------
+Amount: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (CASH ON DELIVERY)` : 'Rs. 0 (PREPAID)'}
+
+SENDER (RETURN ADDRESS):
+-------------------------------------------
+Soghat-e-Chakwal Main Facility
+Chakwal, Punjab, Pakistan
+Helpline / WhatsApp: 0300-8325693
+===========================================`;
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Soghat-Parcel-${order.orderNumber}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 3000);
   };
 
   const handleDownloadFile = () => {
@@ -96,17 +188,6 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
     setTimeout(() => setDownloadSuccess(false), 3000);
   };
 
-  const formattedDate = new Date(order.createdAt).toLocaleDateString('en-PK', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-
-  const formattedTime = new Date(order.createdAt).toLocaleTimeString('en-PK', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       {/* Modal Container */}
@@ -143,11 +224,36 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
             </div>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto">
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            <button
+              onClick={handleCopyCourierText}
+              className="flex items-center gap-1.5 bg-brand-gold/20 hover:bg-brand-gold text-brand-cream hover:text-brand-charcoal border border-brand-gold/40 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95"
+              title="Copy customer name, phone, address & COD amount for courier booking"
+            >
+              {copiedText ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-300" />
+                  Copied to Clipboard!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" />
+                  Copy Courier Details
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleDownloadTextSlip}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all border border-white/20 active:scale-95"
+              title="Download text slip that opens on any phone"
+            >
+              <FileDown className="w-4 h-4" />
+              Download .txt
+            </button>
             <button
               onClick={handleDownloadFile}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
-              title="Download standalone slip file to device"
+              title="Download standalone HTML slip file to device"
             >
               {downloadSuccess ? (
                 <>
@@ -157,7 +263,7 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  Download Slip File
+                  Download HTML
                 </>
               )}
             </button>
@@ -535,22 +641,29 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
               ? '📦 Print this Parcel Slip and attach to the courier flyer or box envelope pocket.'
               : '🧾 Detailed Invoice for customer accounting & records.'}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={handleDownloadFile}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              onClick={handleCopyCourierText}
+              className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
             >
-              {downloadSuccess ? (
+              {copiedText ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-200" />
-                  Downloaded!
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  Copied!
                 </>
               ) : (
                 <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download File
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Courier Text
                 </>
               )}
+            </button>
+            <button
+              onClick={handleDownloadTextSlip}
+              className="bg-stone-200 hover:bg-stone-300 text-stone-800 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              Download .txt
             </button>
             <button
               onClick={handlePrint}

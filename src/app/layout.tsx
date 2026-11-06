@@ -51,11 +51,25 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
-
-        {/* Official Meta (Facebook) Pixel Code — Head Integration */}
-        <script
+      </head>
+      <body className="min-h-full flex flex-col font-body bg-brand-ivory text-brand-charcoal">
+        {/* Official Meta (Facebook) Pixel Code — ID: 1559230849573012 */}
+        <Script
+          id="meta-pixel"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js'); fbq('init', '1559230849573012'); fbq('track', 'PageView');`,
+            __html: `
+              !function(f,b,e,v,n,t,s)
+              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+              n.queue=[];t=b.createElement(e);t.async=!0;
+              t.src=v;s=b.getElementsByTagName(e)[0];
+              s.parentNode.insertBefore(t,s)}(window, document,'script',
+              'https://connect.facebook.net/en_US/fbevents.js');
+              fbq('init', '1559230849573012');
+              fbq('track', 'PageView');
+            `,
           }}
         />
         <noscript>
@@ -67,8 +81,7 @@ export default function RootLayout({
             alt=""
           />
         </noscript>
-      </head>
-      <body className="min-h-full flex flex-col font-body bg-brand-ivory text-brand-charcoal">
+
         <Header />
         <AnalyticsTracker />
         <main className="flex-1">{children}</main>

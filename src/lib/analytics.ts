@@ -21,7 +21,7 @@ export interface FunnelMetrics {
   lastUpdated: string;
 }
 
-const FUNNEL_STORAGE_KEY = 'sec_analytics_funnel';
+const FUNNEL_STORAGE_KEY = 'sec_funnel_v3';
 
 const zeroFunnel: FunnelMetrics = {
   sessions: 0,
@@ -33,25 +33,47 @@ const zeroFunnel: FunnelMetrics = {
   lastUpdated: new Date().toISOString(),
 };
 
+export function resetFunnelMetrics(): FunnelMetrics {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('sec_analytics_funnel');
+      localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(zeroFunnel));
+    } catch {}
+  }
+  return zeroFunnel;
+}
+
 export function getFunnelMetrics(): FunnelMetrics {
   if (typeof window === 'undefined') {
     return zeroFunnel;
   }
 
   try {
+    // Aggressively remove old legacy fake key (154 sessions / 480 views)
+    if (localStorage.getItem('sec_analytics_funnel')) {
+      localStorage.removeItem('sec_analytics_funnel');
+    }
+
     const raw = localStorage.getItem(FUNNEL_STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(zeroFunnel));
       return zeroFunnel;
     }
     const parsed = JSON.parse(raw);
+
+    // If leftover fake numbers are detected, wipe them out
+    if (parsed.sessions === 154 || parsed.pageViews === 480) {
+      localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(zeroFunnel));
+      return zeroFunnel;
+    }
+
     return {
-      sessions: Number(parsed.sessions) || 0,
-      pageViews: Number(parsed.pageViews) || 0,
-      productViews: Number(parsed.productViews) || 0,
-      addToCart: Number(parsed.addToCart) || 0,
-      checkouts: Number(parsed.checkouts) || 0,
-      orders: Number(parsed.orders) || 0,
+      sessions: Math.max(0, Number(parsed.sessions) || 0),
+      pageViews: Math.max(0, Number(parsed.pageViews) || 0),
+      productViews: Math.max(0, Number(parsed.productViews) || 0),
+      addToCart: Math.max(0, Number(parsed.addToCart) || 0),
+      checkouts: Math.max(0, Number(parsed.checkouts) || 0),
+      orders: Math.max(0, Number(parsed.orders) || 0),
       lastUpdated: parsed.lastUpdated || new Date().toISOString(),
     };
   } catch {
@@ -66,7 +88,6 @@ export async function fetchServerFunnel(): Promise<FunnelMetrics> {
       const data = await res.json();
       if (typeof window !== 'undefined') {
         const local = getFunnelMetrics();
-        // Take maximum of server & local so counts never reset
         const merged: FunnelMetrics = {
           sessions: Math.max(local.sessions, data.sessions || 0),
           pageViews: Math.max(local.pageViews, data.pageViews || 0),

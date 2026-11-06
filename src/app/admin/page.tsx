@@ -33,6 +33,12 @@ import {
   Tag,
   BarChart3,
   MousePointerClick,
+  RotateCcw,
+  CheckCircle,
+  Check,
+  Copy,
+  FileDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
@@ -44,9 +50,11 @@ import {
   updateStoredOrderStatus,
   updateStoredPaymentStatus,
   saveNewOrder,
+  getSamplePreviewOrder,
+  clearStoredOrders,
 } from '@/lib/orders-db';
 import { OrderInvoice } from '@/components/admin/OrderInvoice';
-import { getFunnelMetrics, fetchServerFunnel, FunnelMetrics } from '@/lib/analytics';
+import { getFunnelMetrics, fetchServerFunnel, resetFunnelMetrics, FunnelMetrics } from '@/lib/analytics';
 import { FB_PIXEL_ID } from '@/lib/pixel';
 
 export default function AdminPage() {
@@ -87,10 +95,76 @@ export default function AdminPage() {
   const [freeShippingMin, setFreeShippingMin] = useState(siteConfig.freeShippingThreshold || 2000);
   const [savedSettings, setSavedSettings] = useState(false);
 
+  // Diagnostic & Toast States
+  const [pixelStatus, setPixelStatus] = useState<'testing' | 'active' | 'blocked' | null>(null);
+  const [resetToast, setResetToast] = useState(false);
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
+  const handleTestPixel = () => {
+    if (typeof window !== 'undefined' && typeof (window as unknown as { fbq?: (...args: unknown[]) => void }).fbq === 'function') {
+      try {
+        (window as unknown as { fbq: (...args: unknown[]) => void }).fbq('trackCustom', 'TestEventFromAdmin', {
+          adminUser: true,
+          time: new Date().toISOString(),
+        });
+        setPixelStatus('active');
+        setTimeout(() => setPixelStatus(null), 4500);
+      } catch {
+        setPixelStatus('blocked');
+        setTimeout(() => setPixelStatus(null), 5000);
+      }
+    } else {
+      setPixelStatus('blocked');
+      setTimeout(() => setPixelStatus(null), 5000);
+    }
+  };
+
+  const handleResetData = () => {
+    if (confirm('Kya aap waqai sara purana fake/cached data delete kar ke live counters 0 par reset karna chahte hain?')) {
+      clearStoredOrders();
+      resetFunnelMetrics();
+      setOrders([]);
+      setFunnel(getFunnelMetrics());
+      setResetToast(true);
+      setTimeout(() => setResetToast(false), 3500);
+    }
+  };
+
+  const handlePreviewSampleSlip = () => {
+    setInvoiceMode('label');
+    setInvoiceOrder(getSamplePreviewOrder());
+  };
+
+  const handleCopyOrderCourierText = (order: Order) => {
+    const text = `=============================
+📦 SOGHAT-E-CHAKWAL PARCEL SLIP
+=============================
+Order ID: ${order.orderNumber}
+Name: ${order.customer.fullName}
+Phone: ${order.customer.phone}
+Address: ${order.customer.address}
+City: ${order.customer.city.toUpperCase()}
+Amount: ${order.paymentMethod === 'cod' ? `Rs. ${order.total.toLocaleString()} (Cash on Delivery)` : 'Rs. 0 (Already Paid)'}
+Return: Soghat-e-Chakwal, 0300-8325693
+=============================`;
+    navigator.clipboard.writeText(text);
+    setCopiedOrderId(order.id);
+    setTimeout(() => setCopiedOrderId(null), 2500);
+  };
+
   // Load orders & persistent products
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
+        // Auto purge old fake data on startup
+        const rawOrders = localStorage.getItem('sec_orders');
+        if (rawOrders && (rawOrders.includes('Ahmad Khan') || rawOrders.includes('SEC-DEMO-') || rawOrders.includes('ord-seed-'))) {
+          localStorage.removeItem('sec_orders');
+        }
+        if (localStorage.getItem('sec_analytics_funnel')) {
+          localStorage.removeItem('sec_analytics_funnel');
+        }
+
         const storedProds = localStorage.getItem('sec_products');
         if (storedProds) {
           setProductList(JSON.parse(storedProds));
@@ -472,8 +546,24 @@ export default function AdminPage() {
               Manage inventory, monitor orders, and customize your e-commerce operations.
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-800 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              onClick={handlePreviewSampleSlip}
+              className="flex items-center gap-1.5 text-xs bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-3.5 py-2 rounded-xl font-bold transition-all shadow-sm active:scale-95"
+              title="Click to preview and test the courier envelope shipping label"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              📦 Preview Envelope Slip
+            </button>
+            <button
+              onClick={handleResetData}
+              className="flex items-center gap-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2 rounded-xl font-bold transition-all shadow-2xs active:scale-95"
+              title="Wipe old fake numbers and reset visitors to 0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              🧹 Clear Cache &amp; Reset
+            </button>
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 shadow-2xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
@@ -482,6 +572,14 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* Reset Notification Toast */}
+        {resetToast && (
+          <div className="fixed top-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-2 animate-bounce">
+            <CheckCircle className="w-4 h-4 text-emerald-200" />
+            <span>Cache Cleared! Fake data removed &amp; counters reset to 0.</span>
+          </div>
+        )}
 
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
@@ -511,6 +609,14 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={handleTestPixel}
+                    className="inline-flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-400 text-white px-3.5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95"
+                    title="Fire a test event to verify Meta Pixel connection"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Test Pixel Event
+                  </button>
                   <a
                     href={`https://business.facebook.com/events_manager2/list/dataset/${FB_PIXEL_ID}/test_events`}
                     target="_blank"
@@ -528,6 +634,20 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Pixel Diagnostic Feedback */}
+              {pixelStatus === 'active' && (
+                <div className="mt-3 p-2.5 bg-emerald-500/20 border border-emerald-400/40 rounded-xl text-xs text-emerald-200 font-bold flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-300" />
+                  <span>✅ Meta Pixel is Active! Test event sent to Facebook Events Manager dataset {FB_PIXEL_ID}.</span>
+                </div>
+              )}
+              {pixelStatus === 'blocked' && (
+                <div className="mt-3 p-2.5 bg-amber-500/20 border border-amber-400/40 rounded-xl text-xs text-amber-200 font-medium flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-300 flex-shrink-0" />
+                  <span>AdBlocker detected in browser or fbq not loaded yet. If using an AdBlocker extension, please pause it to test.</span>
+                </div>
+              )}
 
               {/* Event Status Badges */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-white/10 text-center">
@@ -681,9 +801,27 @@ export default function AdminPage() {
               </div>
 
               {orders.length === 0 ? (
-                <p className="text-sm text-stone-400 py-6 text-center">
-                  No orders recorded yet. Place an order on the checkout page to see it here!
-                </p>
+                <div className="py-8 text-center space-y-3">
+                  <p className="text-sm text-stone-500 font-medium">
+                    Clean database active: Zero fake orders.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowAddOrderModal(true)}
+                      className="inline-flex items-center gap-1.5 bg-brand-green text-brand-cream hover:bg-brand-green-light px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-brand-gold" />
+                      + Add New Customer Order
+                    </button>
+                    <button
+                      onClick={handlePreviewSampleSlip}
+                      className="inline-flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                    >
+                      <Tag className="w-3.5 h-3.5" />
+                      📦 Preview Sample Parcel Slip
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -713,6 +851,23 @@ export default function AdminPage() {
                           </td>
                           <td className="py-3 px-2 text-right">
                             <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleCopyOrderCourierText(o)}
+                                className="inline-flex items-center gap-1 text-[11px] bg-stone-100 hover:bg-stone-200 text-stone-700 px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
+                                title="Copy Name, Phone, Address & COD for courier booking"
+                              >
+                                {copiedOrderId === o.id ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    Copy
+                                  </>
+                                )}
+                              </button>
                               <button
                                 onClick={() => {
                                   setInvoiceMode('label');
@@ -778,9 +933,31 @@ export default function AdminPage() {
               </div>
 
               {orders.length === 0 ? (
-                <p className="text-sm text-stone-400 py-8 text-center">
-                  No orders found.
-                </p>
+                <div className="py-12 text-center space-y-3">
+                  <Package className="w-10 h-10 text-stone-300 mx-auto" />
+                  <p className="text-sm text-stone-600 font-semibold">
+                    No Customer Orders Yet
+                  </p>
+                  <p className="text-xs text-stone-400 max-w-sm mx-auto">
+                    Clean database active: All fake demo orders have been purged. Real incoming orders from checkout or WhatsApp will appear here live.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    <button
+                      onClick={() => setShowAddOrderModal(true)}
+                      className="inline-flex items-center gap-1.5 bg-brand-green text-brand-cream hover:bg-brand-green-light px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-brand-gold" />
+                      + Create WhatsApp / Phone Order
+                    </button>
+                    <button
+                      onClick={handlePreviewSampleSlip}
+                      className="inline-flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      <Tag className="w-3.5 h-3.5" />
+                      📦 Preview Parcel Shipping Slip
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -876,10 +1053,21 @@ export default function AdminPage() {
                           <td className="py-4 px-3">
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={() => setSelectedOrder(order)}
-                                className="text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-2.5 py-1.5 rounded-lg font-medium transition-colors"
+                                onClick={() => handleCopyOrderCourierText(order)}
+                                className="inline-flex items-center gap-1 text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 px-2 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title="Copy Name, Phone, Address & COD for courier booking"
                               >
-                                Items
+                                {copiedOrderId === order.id ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    Copied!
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    Copy
+                                  </>
+                                )}
                               </button>
                               <button
                                 onClick={() => {

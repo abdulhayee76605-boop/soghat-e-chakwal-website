@@ -8,6 +8,15 @@ import { Order, OrderStatus, PaymentStatus } from './types';
 // Zero fake seed data — starts clean with real customer orders only
 export const demoOrders: Order[] = [];
 
+function isFakeOrder(order: Order): boolean {
+  if (!order) return true;
+  if (order.id?.startsWith('ord-seed-')) return true;
+  if (order.orderNumber?.includes('DEMO')) return true;
+  if (order.customer?.fullName === 'Ahmad Khan') return true;
+  if (order.customer?.fullName === 'Fatima Malik') return true;
+  return false;
+}
+
 export function getStoredOrders(): Order[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -16,13 +25,87 @@ export function getStoredOrders(): Order[] {
       return [];
     }
     const parsed = JSON.parse(raw);
-    // Filter out any leftover fake demo orders
-    return Array.isArray(parsed)
-      ? parsed.filter((o: Order) => !o.id?.startsWith('ord-seed-'))
-      : [];
+    if (!Array.isArray(parsed)) return [];
+
+    // Filter out ANY legacy demo orders
+    const cleaned = parsed.filter((o: Order) => !isFakeOrder(o));
+
+    // If cleaned array length is different, overwrite localStorage to remove fake data permanently
+    if (cleaned.length !== parsed.length) {
+      localStorage.setItem('sec_orders', JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
     return [];
   }
+}
+
+export function clearStoredOrders(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem('sec_orders');
+    } catch {}
+  }
+}
+
+export function getSamplePreviewOrder(): Order {
+  return {
+    id: 'sample-preview-slip',
+    orderNumber: 'SEC-PK-7829',
+    items: [
+      {
+        productId: 'prod-mustard-oil-1l',
+        variantId: 'var-1l',
+        quantity: 2,
+        product: {
+          id: 'prod-mustard-oil-1l',
+          slug: 'mustard-oil-1-liter',
+          name: 'Soghat-e-Chakwal Mustard Oil (1 Liter)',
+          nameUrdu: 'سوغات چکوال خالص سرسوں کا تیل',
+          category: 'Cooking Oils',
+          categorySlug: 'cooking-oils',
+          description: '',
+          shortDescription: '',
+          features: [],
+          images: [],
+          variants: [],
+          isActive: true,
+          isFeatured: true,
+          createdAt: '',
+          updatedAt: '',
+          tags: [],
+        },
+        variant: {
+          id: 'var-1l',
+          name: '1 Liter Bottle',
+          size: '1L',
+          price: 750,
+          sku: 'SEC-MO-1L',
+          weight: 1100,
+          inStock: true,
+          stockQuantity: 48,
+        },
+      },
+    ],
+    customer: {
+      fullName: 'Muhammad Ali Khan (Sample)',
+      phone: '0300-1234567',
+      whatsapp: '0300-1234567',
+      address: 'House #45, Street #3, Sector F-8/2',
+      city: 'Islamabad',
+      province: 'Islamabad Capital Territory',
+      postalCode: '44000',
+      notes: 'Near Allied Bank, Main Double Road',
+    },
+    paymentMethod: 'cod',
+    paymentStatus: 'pending',
+    status: 'pending',
+    subtotal: 1500,
+    shipping: 0,
+    total: 1500,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export async function fetchServerOrders(): Promise<Order[]> {
