@@ -38,9 +38,15 @@ import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
-import { getStoredOrders, updateStoredOrderStatus, saveNewOrder } from '@/lib/orders-db';
+import {
+  getStoredOrders,
+  fetchServerOrders,
+  updateStoredOrderStatus,
+  updateStoredPaymentStatus,
+  saveNewOrder,
+} from '@/lib/orders-db';
 import { OrderInvoice } from '@/components/admin/OrderInvoice';
-import { getFunnelMetrics, FunnelMetrics } from '@/lib/analytics';
+import { getFunnelMetrics, fetchServerFunnel, FunnelMetrics } from '@/lib/analytics';
 import { FB_PIXEL_ID } from '@/lib/pixel';
 
 export default function AdminPage() {
@@ -184,20 +190,27 @@ export default function AdminPage() {
     setInvoiceOrder(newOrder);
   };
 
-  // Load orders from API
+  // Load orders from API & live sync
   useEffect(() => {
     if (isAuthenticated) {
       fetchOrders();
+      // Auto-refresh every 5 seconds for live visitor sessions, checkouts, and incoming customer orders
+      const interval = setInterval(() => {
+        fetchOrders();
+      }, 5000);
+      return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
 
-  const fetchOrders = () => {
+  const fetchOrders = async () => {
     try {
-      const stored = getStoredOrders();
-      setOrders(stored);
-      setFunnel(getFunnelMetrics());
+      const serverOrders = await fetchServerOrders();
+      setOrders(serverOrders);
+      const serverFunnel = await fetchServerFunnel();
+      setFunnel(serverFunnel);
     } catch {
-      // Fallback
+      setOrders(getStoredOrders());
+      setFunnel(getFunnelMetrics());
     }
   };
 
@@ -227,13 +240,10 @@ export default function AdminPage() {
 
   const updatePaymentStatus = (orderId: string, paymentStatus: PaymentStatus) => {
     try {
-      setOrders((prev) => {
-        const updated = prev.map((o) => (o.id === orderId ? { ...o, paymentStatus } : o));
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('sec_orders', JSON.stringify(updated));
-        }
-        return updated;
-      });
+      updateStoredPaymentStatus(orderId, paymentStatus);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, paymentStatus } : o))
+      );
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, paymentStatus } : null));
       }
@@ -463,9 +473,13 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
-              Live Demo Mode (Local Store)
-            </span>
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-full text-xs font-bold text-emerald-800 shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+              </span>
+              <span>Live Store &bull; Real Database Active</span>
+            </div>
           </div>
         </div>
 

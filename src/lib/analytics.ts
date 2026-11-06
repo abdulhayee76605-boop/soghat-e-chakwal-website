@@ -23,46 +23,68 @@ export interface FunnelMetrics {
 
 const FUNNEL_STORAGE_KEY = 'sec_analytics_funnel';
 
+const zeroFunnel: FunnelMetrics = {
+  sessions: 0,
+  pageViews: 0,
+  productViews: 0,
+  addToCart: 0,
+  checkouts: 0,
+  orders: 0,
+  lastUpdated: new Date().toISOString(),
+};
+
 export function getFunnelMetrics(): FunnelMetrics {
   if (typeof window === 'undefined') {
-    return {
-      sessions: 154,
-      pageViews: 480,
-      productViews: 320,
-      addToCart: 86,
-      checkouts: 42,
-      orders: 23,
-      lastUpdated: new Date().toISOString(),
-    };
+    return zeroFunnel;
   }
 
   try {
     const raw = localStorage.getItem(FUNNEL_STORAGE_KEY);
     if (!raw) {
-      const initial: FunnelMetrics = {
-        sessions: 154,
-        pageViews: 480,
-        productViews: 320,
-        addToCart: 86,
-        checkouts: 42,
-        orders: 23,
-        lastUpdated: new Date().toISOString(),
-      };
-      localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(initial));
-      return initial;
+      localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(zeroFunnel));
+      return zeroFunnel;
     }
-    return JSON.parse(raw);
-  } catch {
+    const parsed = JSON.parse(raw);
     return {
-      sessions: 154,
-      pageViews: 480,
-      productViews: 320,
-      addToCart: 86,
-      checkouts: 42,
-      orders: 23,
-      lastUpdated: new Date().toISOString(),
+      sessions: Number(parsed.sessions) || 0,
+      pageViews: Number(parsed.pageViews) || 0,
+      productViews: Number(parsed.productViews) || 0,
+      addToCart: Number(parsed.addToCart) || 0,
+      checkouts: Number(parsed.checkouts) || 0,
+      orders: Number(parsed.orders) || 0,
+      lastUpdated: parsed.lastUpdated || new Date().toISOString(),
     };
+  } catch {
+    return zeroFunnel;
   }
+}
+
+export async function fetchServerFunnel(): Promise<FunnelMetrics> {
+  try {
+    const res = await fetch('/api/analytics', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof window !== 'undefined') {
+        const local = getFunnelMetrics();
+        // Take maximum of server & local so counts never reset
+        const merged: FunnelMetrics = {
+          sessions: Math.max(local.sessions, data.sessions || 0),
+          pageViews: Math.max(local.pageViews, data.pageViews || 0),
+          productViews: Math.max(local.productViews, data.productViews || 0),
+          addToCart: Math.max(local.addToCart, data.addToCart || 0),
+          checkouts: Math.max(local.checkouts, data.checkouts || 0),
+          orders: Math.max(local.orders, data.orders || 0),
+          lastUpdated: data.lastUpdated || new Date().toISOString(),
+        };
+        localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(merged));
+        return merged;
+      }
+      return data;
+    }
+  } catch {
+    // Fallback to local
+  }
+  return getFunnelMetrics();
 }
 
 export function trackFunnelStep(step: keyof Omit<FunnelMetrics, 'lastUpdated'>) {
@@ -72,6 +94,13 @@ export function trackFunnelStep(step: keyof Omit<FunnelMetrics, 'lastUpdated'>) 
     current[step] = (current[step] || 0) + 1;
     current.lastUpdated = new Date().toISOString();
     localStorage.setItem(FUNNEL_STORAGE_KEY, JSON.stringify(current));
+
+    // Also send to shared server endpoint
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ step }),
+    }).catch(() => {});
   } catch {
     // Ignore
   }
@@ -154,7 +183,6 @@ export function trackPurchase(orderNumber: string, total: number, items: Analyti
   trackFunnelStep('orders');
   if (typeof window === 'undefined') return;
 
-  // Prevent duplicate firing using sessionStorage
   const purchaseKey = `tracked_purchase_${orderNumber}`;
   if (sessionStorage.getItem(purchaseKey)) return;
   sessionStorage.setItem(purchaseKey, 'true');

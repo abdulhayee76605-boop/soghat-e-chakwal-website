@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   QrCode,
   Tag,
+  Download,
+  Check,
 } from 'lucide-react';
 import { Order } from '@/lib/types';
 import { formatPrice } from '@/lib/utils';
@@ -32,10 +34,66 @@ interface OrderInvoiceProps {
 
 export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInvoiceProps) {
   const [viewMode, setViewMode] = useState<'label' | 'invoice'>(defaultMode);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadFile = () => {
+    if (!printableRef.current) return;
+    const isSlip = viewMode === 'label';
+    const filename = isSlip
+      ? `Soghat-Chakwal-Parcel-Slip-${order.orderNumber}.html`
+      : `Soghat-Chakwal-Invoice-${order.orderNumber}.html`;
+
+    const slipInnerHtml = printableRef.current.innerHTML;
+
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${isSlip ? 'Parcel Shipping Slip' : 'Customer Tax Invoice'} - ${order.orderNumber}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; padding: 0 !important; }
+      #slip-content { box-shadow: none !important; border: 2px solid #000 !important; }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; padding: 16px; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="no-print max-w-2xl mx-auto mb-4 bg-emerald-900 text-white p-3.5 rounded-2xl flex flex-wrap justify-between items-center gap-3 shadow-lg">
+    <div>
+      <p class="text-xs uppercase font-bold tracking-wider text-emerald-300">📦 Soghat-e-Chakwal Dispatch Document</p>
+      <p class="text-xs text-white/80">Order: ${order.orderNumber} &bull; Consignee: ${order.customer.fullName}</p>
+    </div>
+    <button onclick="window.print()" style="background:#D4AF37; color:#1c1917; font-weight:900; padding:8px 18px; border-radius:10px; border:none; cursor:pointer; font-size:12px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+      🖨️ Print Slip / Save PDF
+    </button>
+  </div>
+  <div id="slip-content" class="max-w-2xl mx-auto">
+    ${slipInnerHtml}
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 3000);
   };
 
   const formattedDate = new Date(order.createdAt).toLocaleDateString('en-PK', {
@@ -86,6 +144,23 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            <button
+              onClick={handleDownloadFile}
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+              title="Download standalone slip file to device"
+            >
+              {downloadSuccess ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-200" />
+                  Downloaded!
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Download Slip File
+                </>
+              )}
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2 rounded-xl text-xs font-black transition-all shadow-md active:scale-95"
@@ -461,6 +536,22 @@ export function OrderInvoice({ order, onClose, defaultMode = 'label' }: OrderInv
               : '🧾 Detailed Invoice for customer accounting & records.'}
           </p>
           <div className="flex gap-2">
+            <button
+              onClick={handleDownloadFile}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+            >
+              {downloadSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-200" />
+                  Downloaded!
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  Download File
+                </>
+              )}
+            </button>
             <button
               onClick={handlePrint}
               className="bg-brand-green text-brand-cream hover:bg-brand-green-light px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"

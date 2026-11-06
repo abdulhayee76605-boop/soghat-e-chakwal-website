@@ -1,139 +1,55 @@
 // ============================================================
-// Orders Store — Client-persistent with seed data
-// Production & Static-export ready
+// Orders Store — Clean Production Real Orders
+// Syncs with server API and local storage
 // ============================================================
 
-import { Order, OrderStatus } from './types';
+import { Order, OrderStatus, PaymentStatus } from './types';
 
-export const demoOrders: Order[] = [
-  {
-    id: 'ord-seed-01',
-    orderNumber: 'SEC-DEMO-9821',
-    items: [
-      {
-        productId: 'prod-mustard-oil-1l',
-        variantId: 'var-1l',
-        quantity: 2,
-        product: {
-          id: 'prod-mustard-oil-1l',
-          slug: 'mustard-oil-1-liter',
-          name: 'Soghat-e-Chakwal Mustard Oil (1 Liter)',
-          nameUrdu: 'سوغات چکوال سرسوں کا تیل — ۱ لٹر',
-          category: 'Cooking Oils',
-          categorySlug: 'cooking-oils',
-          description: '',
-          shortDescription: '',
-          features: [],
-          images: [],
-          variants: [],
-          isActive: true,
-          isFeatured: true,
-          createdAt: '',
-          updatedAt: '',
-          tags: [],
-        },
-        variant: {
-          id: 'var-1l',
-          name: '1 Liter Bottle',
-          size: '1L',
-          price: 750,
-          sku: 'SEC-MO-1L',
-          weight: 1100,
-          inStock: true,
-          stockQuantity: 48,
-        },
-      },
-    ],
-    customer: {
-      fullName: 'Ahmad Khan',
-      phone: '03001234567',
-      whatsapp: '03001234567',
-      email: 'ahmad@example.com',
-      address: 'House 42, Street 8, Sector F-10/2',
-      city: 'Islamabad',
-      province: 'Islamabad Capital Territory',
-      postalCode: '44000',
-    },
-    paymentMethod: 'cod',
-    paymentStatus: 'pending',
-    status: 'confirmed',
-    subtotal: 1500,
-    shipping: 0,
-    total: 1500,
-    createdAt: '2026-11-01T10:30:00Z',
-    updatedAt: '2026-11-01T10:30:00Z',
-  },
-  {
-    id: 'ord-seed-02',
-    orderNumber: 'SEC-DEMO-9822',
-    items: [
-      {
-        productId: 'prod-mustard-oil-500ml',
-        variantId: 'var-500ml',
-        quantity: 1,
-        product: {
-          id: 'prod-mustard-oil-500ml',
-          slug: 'mustard-oil-500ml',
-          name: 'Soghat-e-Chakwal Mustard Oil (500ml)',
-          nameUrdu: 'سوغات چکوال سرسوں کا تیل — ۵۰۰ ملی لٹر',
-          category: 'Cooking Oils',
-          categorySlug: 'cooking-oils',
-          description: '',
-          shortDescription: '',
-          features: [],
-          images: [],
-          variants: [],
-          isActive: true,
-          isFeatured: true,
-          createdAt: '',
-          updatedAt: '',
-          tags: [],
-        },
-        variant: {
-          id: 'var-500ml',
-          name: '500ml Bottle',
-          size: '500ml',
-          price: 450,
-          sku: 'SEC-MO-500ML',
-          weight: 600,
-          inStock: true,
-          stockQuantity: 32,
-        },
-      },
-    ],
-    customer: {
-      fullName: 'Fatima Malik',
-      phone: '03219876543',
-      whatsapp: '03219876543',
-      email: 'fatima@example.com',
-      address: 'Plot 15, Block C, Model Town',
-      city: 'Lahore',
-      province: 'Punjab',
-      postalCode: '54000',
-    },
-    paymentMethod: 'bank_transfer',
-    paymentStatus: 'received',
-    status: 'shipped',
-    subtotal: 450,
-    shipping: 200,
-    total: 650,
-    createdAt: '2026-11-01T14:15:00Z',
-    updatedAt: '2026-11-01T14:15:00Z',
-  },
-];
+// Zero fake seed data — starts clean with real customer orders only
+export const demoOrders: Order[] = [];
 
 export function getStoredOrders(): Order[] {
-  if (typeof window === 'undefined') return demoOrders;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem('sec_orders');
     if (!raw) {
-      localStorage.setItem('sec_orders', JSON.stringify(demoOrders));
-      return demoOrders;
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Filter out any leftover fake demo orders
+    return Array.isArray(parsed)
+      ? parsed.filter((o: Order) => !o.id?.startsWith('ord-seed-'))
+      : [];
   } catch {
-    return demoOrders;
+    return [];
   }
+}
+
+export async function fetchServerOrders(): Promise<Order[]> {
+  try {
+    const res = await fetch('/api/orders', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.orders)) {
+        // Merge with local storage
+        if (typeof window !== 'undefined') {
+          const local = getStoredOrders();
+          const mergedMap = new Map<string, Order>();
+          local.forEach((o) => mergedMap.set(o.id, o));
+          data.orders.forEach((o: Order) => mergedMap.set(o.id, o));
+          const merged = Array.from(mergedMap.values()).sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          localStorage.setItem('sec_orders', JSON.stringify(merged));
+          return merged;
+        }
+        return data.orders;
+      }
+    }
+  } catch {
+    // Fallback to local
+  }
+  return getStoredOrders();
 }
 
 export function saveNewOrder(orderData: {
@@ -156,16 +72,21 @@ export function saveNewOrder(orderData: {
     notes: orderData.customer?.notes,
   };
 
+  // 1. Save to local storage
   if (typeof window !== 'undefined') {
     try {
       const orders = getStoredOrders();
       orders.unshift(newOrder);
       localStorage.setItem('sec_orders', JSON.stringify(orders));
     } catch {
-      demoOrders.unshift(newOrder);
+      // Ignore
     }
-  } else {
-    demoOrders.unshift(newOrder);
+    // 2. Transmit to server API so admin can view cross-device
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newOrder),
+    }).catch(() => {});
   }
 
   return newOrder;
@@ -176,6 +97,28 @@ export function updateStoredOrderStatus(orderId: string, status: OrderStatus): v
     try {
       const orders = getStoredOrders().map((o) => (o.id === orderId ? { ...o, status } : o));
       localStorage.setItem('sec_orders', JSON.stringify(orders));
+      // Notify server
+      fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status }),
+      }).catch(() => {});
+    } catch {
+      // Fallback
+    }
+  }
+}
+
+export function updateStoredPaymentStatus(orderId: string, paymentStatus: PaymentStatus): void {
+  if (typeof window !== 'undefined') {
+    try {
+      const orders = getStoredOrders().map((o) => (o.id === orderId ? { ...o, paymentStatus } : o));
+      localStorage.setItem('sec_orders', JSON.stringify(orders));
+      fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, paymentStatus }),
+      }).catch(() => {});
     } catch {
       // Fallback
     }
