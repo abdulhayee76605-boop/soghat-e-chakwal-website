@@ -92,12 +92,12 @@ export default function AdminPage() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductCategory, setNewProductCategory] = useState('Cooking Oils');
-  const [newPrice1L, setNewPrice1L] = useState('750');
-  const [newPrice500ml, setNewPrice500ml] = useState('450');
+  const [newPrice1L, setNewPrice1L] = useState('700');
+  const [newPrice500ml, setNewPrice500ml] = useState('350');
 
   // Config state
   const [shippingRate, setShippingRate] = useState(siteConfig.shippingCharge);
-  const [freeShippingMin, setFreeShippingMin] = useState(siteConfig.freeShippingThreshold || 2000);
+  const [freeShippingMin, setFreeShippingMin] = useState(siteConfig.freeShippingThreshold || 2100);
   const [savedSettings, setSavedSettings] = useState(false);
 
   // Diagnostic & Toast States
@@ -259,9 +259,10 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
   const handleCreateManualOrder = (e: React.FormEvent) => {
     e.preventDefault();
     const is1L = manualProductChoice === '1l';
-    const unitPrice = is1L ? 750 : 450;
+    const unitPrice = is1L ? 700 : 350;
     const subtotal = unitPrice * manualQty;
-    const shipping = subtotal >= freeShippingMin ? 0 : shippingRate;
+    const totalLiters = (is1L ? 1 : 0.5) * manualQty;
+    const shipping = (totalLiters >= 3 || subtotal >= freeShippingMin) ? 0 : shippingRate;
     const total = subtotal + shipping;
 
     const prod = productList[is1L ? 0 : 1] || initialProducts[0];
@@ -403,7 +404,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           id: `var-${Date.now()}-1`,
           name: '1 Liter',
           size: '1L',
-          price: Number(newPrice1L) || 750,
+          price: Number(newPrice1L) || 700,
           sku: `SEC-${Date.now()}-1L`,
           weight: 1000,
           inStock: true,
@@ -413,7 +414,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           id: `var-${Date.now()}-2`,
           name: '500ml',
           size: '500ml',
-          price: Number(newPrice500ml) || 450,
+          price: Number(newPrice500ml) || 350,
           sku: `SEC-${Date.now()}-500ML`,
           weight: 500,
           inStock: true,
@@ -1771,8 +1772,8 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       onChange={(e) => setManualProductChoice(e.target.value as '1l' | '500ml')}
                       className="w-full px-3.5 py-2.5 border rounded-xl bg-white"
                     >
-                      <option value="1l">1 Liter Bottle (Rs. 750)</option>
-                      <option value="500ml">500ml Bottle (Rs. 450)</option>
+                      <option value="1l">1 Liter Bottle (Rs. 700)</option>
+                      <option value="500ml">500ml Bottle (Rs. 350)</option>
                     </select>
                   </div>
                   <div>
@@ -1804,8 +1805,9 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   <span className="font-semibold text-stone-700">Total Payable (with Shipping):</span>
                   <span className="font-black font-mono text-base text-brand-green">
                     {formatPrice(
-                      (manualProductChoice === '1l' ? 750 : 450) * manualQty +
-                        ((manualProductChoice === '1l' ? 750 : 450) * manualQty >= freeShippingMin
+                      (manualProductChoice === '1l' ? 700 : 350) * manualQty +
+                        (((manualProductChoice === '1l' ? 1 : 0.5) * manualQty >= 3 ||
+                          (manualProductChoice === '1l' ? 700 : 350) * manualQty >= freeShippingMin)
                           ? 0
                           : shippingRate)
                     )}

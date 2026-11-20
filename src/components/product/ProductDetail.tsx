@@ -46,7 +46,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
       id: 'default',
       name: is1L ? '1 Liter' : '500ml',
       size: is1L ? '1L' : '500ml',
-      price: is1L ? 750 : 450,
+      price: is1L ? 700 : 350,
       sku: is1L ? 'SEC-1L' : 'SEC-500ML',
       weight: is1L ? 1000 : 500,
       inStock: true,
@@ -320,7 +320,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                       </p>
                     </div>
                     <span className={`font-bold text-sm ${is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                      Rs. 750
+                      Rs. 700
                     </span>
                   </div>
                 </Link>
@@ -341,7 +341,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                       </p>
                     </div>
                     <span className={`font-bold text-sm ${!is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                      Rs. 450
+                      Rs. 350
                     </span>
                   </div>
                 </Link>
@@ -471,7 +471,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                     <ul className="list-disc list-inside space-y-1 text-xs">
                       <li>Cash on Delivery available all over Pakistan.</li>
                       <li>Standard delivery time: 2-4 business days.</li>
-                      <li>Delivery charges: Rs. 200 (Free for orders Rs. 2,000+).</li>
+                      <li>Delivery charges: Rs. 200 (Free for orders of 3 Liters or more / Rs. 2,100+).</li>
                     </ul>
                   </div>
                 )}

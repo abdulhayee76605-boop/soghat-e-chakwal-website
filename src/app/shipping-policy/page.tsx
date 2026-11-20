@@ -40,7 +40,7 @@ export default function ShippingPolicyPage() {
           </h2>
           <ul className="list-disc list-inside space-y-1.5 pl-2">
             <li><strong>Standard Flat Rate:</strong> Rs. 200 per order across Pakistan.</li>
-            <li><strong>Free Delivery:</strong> Enjoy completely free delivery on all orders of Rs. 2,000 and above!</li>
+            <li><strong>Free Delivery:</strong> Enjoy completely free delivery on all orders of 3 Liters (3L) and above (or Rs. 2,100+)!</li>
           </ul>
         </section>
 

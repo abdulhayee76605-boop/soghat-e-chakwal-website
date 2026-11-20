@@ -46,7 +46,7 @@ export async function generateMetadata({
       ],
     },
     other: {
-      'product:price:amount': primaryVariant ? primaryVariant.price.toString() : '750',
+      'product:price:amount': primaryVariant ? primaryVariant.price.toString() : '700',
       'product:price:currency': 'PKR',
     },
   };

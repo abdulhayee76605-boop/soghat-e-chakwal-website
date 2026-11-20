@@ -24,6 +24,7 @@ export function CartDrawer() {
     getShipping,
     getTotal,
     getItemCount,
+    getTotalLiters,
   } = useCartStore();
 
   useEffect(() => {
@@ -48,6 +49,9 @@ export function CartDrawer() {
   const shipping = getShipping(subtotal);
   const total = getTotal();
   const itemCount = getItemCount();
+  const totalLiters = getTotalLiters();
+  const litersLeft = Math.max(0, 3 - totalLiters);
+  const freeShippingLeft = Math.max(0, 2100 - subtotal);
 
   const handleWhatsAppOrder = () => {
     if (items.length === 0) return;
@@ -218,7 +222,11 @@ export function CartDrawer() {
                   </div>
                   {shipping > 0 && (
                     <p className="text-[11px] text-brand-terracotta">
-                      Add {formatPrice(2000 - subtotal)} more for Free Shipping across Pakistan!
+                      {litersLeft > 0 ? (
+                        <>Add <strong className="font-bold">{litersLeft}L more</strong> (or {formatPrice(freeShippingLeft)}) for Free Shipping!</>
+                      ) : (
+                        <>Add {formatPrice(freeShippingLeft)} more for Free Shipping (Orders 3L+)!</>
+                      )}
                     </p>
                   )}
                   <div className="flex justify-between text-base font-bold text-brand-green pt-2 border-t border-brand-green/10">

@@ -16,7 +16,8 @@ export const siteConfig: SiteConfig = {
     'Islamabad, Pakistan.',
   ],
   shippingCharge: 200,
-  freeShippingThreshold: 2000,
+  freeShippingThreshold: 2100,
+  freeShippingLiters: 3,
   bankDetails: {
     bankName: 'To be configured',
     accountTitle: 'To be configured',

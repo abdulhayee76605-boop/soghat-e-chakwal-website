@@ -91,7 +91,7 @@ export const products: Product[] = [
       {
         question: 'What are the delivery charges?',
         answer:
-          'Standard delivery is Rs. 200 across Pakistan, and orders of Rs. 2,000 or more enjoy completely FREE delivery.',
+          'Standard delivery is Rs. 200 across Pakistan, and orders of 3 Liters (3L) or more enjoy completely FREE delivery.',
       },
     ],
     images: [
@@ -117,7 +117,7 @@ export const products: Product[] = [
         id: 'var-1l',
         name: '1 Liter Bottle',
         size: '1L',
-        price: 750,
+        price: 700,
         sku: 'SEC-MO-1L',
         weight: 1100,
         image: '/images/products/mustard-oil-1l.png',
@@ -191,7 +191,7 @@ export const products: Product[] = [
         id: 'var-500ml',
         name: '500ml Bottle',
         size: '500ml',
-        price: 450,
+        price: 350,
         sku: 'SEC-MO-500ML',
         weight: 600,
         image: '/images/products/mustard-oil-500ml.png',

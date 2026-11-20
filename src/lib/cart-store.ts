@@ -23,6 +23,7 @@ interface CartStore {
 
   // Computed
   getItemCount: () => number;
+  getTotalLiters: () => number;
   getSubtotal: () => number;
   getShipping: (subtotal?: number) => number;
   getTotal: () => number;
@@ -95,6 +96,23 @@ export const useCartStore = create<CartStore>()(
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
       },
 
+      getTotalLiters: () => {
+        return get().items.reduce((sum, item) => {
+          const size = (item.variant.size || '').toLowerCase();
+          let liters = 0;
+          if (size.includes('1l') || size.includes('1 liter') || size === '1l') {
+            liters = 1;
+          } else if (size.includes('500ml') || size.includes('0.5l') || size === '500ml') {
+            liters = 0.5;
+          } else if (item.variant.weight) {
+            liters = item.variant.weight / 1000;
+          } else {
+            liters = item.variant.price / 700;
+          }
+          return sum + liters * item.quantity;
+        }, 0);
+      },
+
       getSubtotal: () => {
         return get().items.reduce(
           (sum, item) => sum + item.variant.price * item.quantity,
@@ -103,9 +121,10 @@ export const useCartStore = create<CartStore>()(
       },
 
       getShipping: (subtotal?: number) => {
+        const liters = get().getTotalLiters();
         const sub = subtotal ?? get().getSubtotal();
-        // Free shipping over 2000 PKR
-        if (sub >= 2000) return 0;
+        // Free shipping for orders above 3 Liters (3L+ / Rs. 2,100+)
+        if (liters >= 3 || sub >= 2100) return 0;
         return 200;
       },
 

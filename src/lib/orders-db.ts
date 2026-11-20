@@ -56,7 +56,7 @@ export function getSamplePreviewOrder(): Order {
       {
         productId: 'prod-mustard-oil-1l',
         variantId: 'var-1l',
-        quantity: 2,
+        quantity: 3,
         product: {
           id: 'prod-mustard-oil-1l',
           slug: 'mustard-oil-1-liter',
@@ -79,7 +79,7 @@ export function getSamplePreviewOrder(): Order {
           id: 'var-1l',
           name: '1 Liter Bottle',
           size: '1L',
-          price: 750,
+          price: 700,
           sku: 'SEC-MO-1L',
           weight: 1100,
           inStock: true,
@@ -100,9 +100,9 @@ export function getSamplePreviewOrder(): Order {
     paymentMethod: 'cod',
     paymentStatus: 'pending',
     status: 'pending',
-    subtotal: 1500,
+    subtotal: 2100,
     shipping: 0,
-    total: 1500,
+    total: 2100,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

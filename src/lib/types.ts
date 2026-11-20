@@ -127,6 +127,7 @@ export interface SiteConfig {
   address: string[];
   shippingCharge: number;
   freeShippingThreshold?: number;
+  freeShippingLiters?: number;
   bankDetails?: {
     bankName: string;
     accountTitle: string;

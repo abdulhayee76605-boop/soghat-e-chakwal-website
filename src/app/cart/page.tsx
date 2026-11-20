@@ -22,6 +22,7 @@ export default function CartPage() {
     getShipping,
     getTotal,
     getItemCount,
+    getTotalLiters,
   } = useCartStore();
 
   useEffect(() => {
@@ -40,9 +41,14 @@ export default function CartPage() {
   const shipping = getShipping(subtotal);
   const total = getTotal();
   const itemCount = getItemCount();
-  const freeShippingThreshold = 2000;
+  const totalLiters = getTotalLiters();
+  const litersLeft = Math.max(0, 3 - totalLiters);
+  const freeShippingThreshold = 2100;
+  const isFreeShipping = shipping === 0 || totalLiters >= 3 || subtotal >= freeShippingThreshold;
   const freeShippingLeft = Math.max(0, freeShippingThreshold - subtotal);
-  const freeShippingPercent = Math.min(100, (subtotal / freeShippingThreshold) * 100);
+  const freeShippingPercent = isFreeShipping
+    ? 100
+    : Math.min(100, Math.max((subtotal / freeShippingThreshold) * 100, (totalLiters / 3) * 100));
 
   const handleWhatsAppOrder = () => {
     if (items.length === 0) return;
@@ -88,13 +94,13 @@ export default function CartPage() {
               <div className="bg-brand-cream p-4 rounded-2xl border border-brand-gold/30">
                 <div className="flex justify-between items-center text-xs font-semibold text-brand-charcoal mb-2">
                   <span>
-                    {freeShippingLeft === 0 ? (
+                    {isFreeShipping ? (
                       <span className="text-emerald-800 font-bold">
-                        🎉 You qualified for FREE Delivery nationwide!
+                        🎉 You qualified for FREE Delivery nationwide (3L+ Order)!
                       </span>
                     ) : (
                       <>
-                        Add <strong className="text-brand-green">{formatPrice(freeShippingLeft)}</strong> more for <strong>FREE Delivery</strong>
+                        Add <strong className="text-brand-green">{litersLeft > 0 ? `${litersLeft}L more` : formatPrice(freeShippingLeft)}</strong> for <strong>FREE Delivery (Orders 3L+)</strong>
                       </>
                     )}
                   </span>

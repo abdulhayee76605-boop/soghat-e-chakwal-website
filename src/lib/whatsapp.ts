@@ -33,7 +33,17 @@ export function generateWhatsAppMessage(items: CartItem[], customerName?: string
     );
   });
 
-  const shipping = subtotal >= 2000 ? 0 : 200;
+  const totalLiters = items.reduce((sum, item) => {
+    const size = (item.variant.size || '').toLowerCase();
+    let liters = 0;
+    if (size.includes('1l') || size.includes('1 liter') || size === '1l') liters = 1;
+    else if (size.includes('500ml') || size.includes('0.5l') || size === '500ml') liters = 0.5;
+    else if (item.variant.weight) liters = item.variant.weight / 1000;
+    else liters = item.variant.price / 700;
+    return sum + liters * item.quantity;
+  }, 0);
+
+  const shipping = totalLiters >= 3 || subtotal >= 2100 ? 0 : 200;
   const total = subtotal + shipping;
 
   lines.push('─────────────────');
