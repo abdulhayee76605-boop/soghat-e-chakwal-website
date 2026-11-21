@@ -48,10 +48,20 @@ export function Header() {
       {/* ── Persistent Crisp White Sticky Header ── */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-md border-b border-brand-green/10 transition-all duration-300 ${
-          isScrolled ? 'shadow-md py-2' : 'shadow-xs py-2.5 sm:py-3'
+          isScrolled ? 'shadow-md' : 'shadow-xs'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Top Promotional Sale Banner */}
+        <div className="bg-gradient-to-r from-brand-green via-emerald-800 to-brand-green text-brand-cream text-[10px] sm:text-xs py-1.5 px-3 text-center font-medium tracking-wide flex items-center justify-center gap-2 border-b border-white/10 shadow-inner">
+          <span className="bg-red-600 text-white font-black text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded shadow-xs animate-pulse">
+            SALE LIVE
+          </span>
+          <span>
+            Special Discount: <strong>1L @ Rs. 700</strong> (was <span className="line-through opacity-75">Rs. 750</span>) • <strong>500ml @ Rs. 350</strong> (was <span className="line-through opacity-75">Rs. 450</span>) • <strong>FREE Delivery on 3L+!</strong>
+          </span>
+        </div>
+
+        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isScrolled ? 'py-2' : 'py-2.5 sm:py-3'}`}>
           <div className="relative flex items-center justify-between">
             {/* ── Mobile Left: Drawer Trigger Menu (Mobile only) ── */}
             <div className="flex items-center lg:hidden z-10">

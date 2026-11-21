@@ -18,6 +18,14 @@ export default function ProductCard({ product }: ProductCardProps) {
   const openCart = useCartStore((s) => s.openCart);
 
   const lowestPrice = Math.min(...product.variants.map((v) => v.price));
+  const comparePrices = product.variants
+    .map((v) => v.compareAtPrice)
+    .filter((p): p is number => typeof p === 'number' && p > 0);
+  const lowestComparePrice = comparePrices.length > 0 ? Math.min(...comparePrices) : null;
+  const hasSale = product.variants.some((v) => v.compareAtPrice && v.compareAtPrice > v.price);
+  const maxSavings = Math.max(
+    ...product.variants.map((v) => (v.compareAtPrice && v.compareAtPrice > v.price ? v.compareAtPrice - v.price : 0))
+  );
   const firstVariant = product.variants[0];
 
   const handleAddToCart = () => {
@@ -58,6 +66,12 @@ export default function ProductCard({ product }: ProductCardProps) {
         <span className="absolute top-3 left-3 bg-brand-green/90 backdrop-blur-md text-brand-cream text-[11px] font-semibold px-3 py-1 rounded-full shadow-sm">
           {product.category}
         </span>
+        {hasSale && (
+          <span className="absolute top-3 right-3 bg-red-600 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-md flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            SALE {maxSavings > 0 ? `• Save Rs. ${maxSavings}` : ''}
+          </span>
+        )}
       </Link>
 
       {/* Info */}
@@ -79,25 +93,45 @@ export default function ProductCard({ product }: ProductCardProps) {
         </p>
 
         {/* Variants summary */}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {product.variants.map((v) => (
             <span
               key={v.id}
-              className="text-[11px] font-semibold bg-brand-cream text-brand-charcoal px-2.5 py-0.5 rounded-lg border border-brand-gold/30"
+              className="text-[11px] font-semibold bg-brand-cream text-brand-charcoal px-2.5 py-1 rounded-lg border border-brand-gold/30 inline-flex items-center gap-1.5"
             >
-              {v.name}: Rs. {v.price}
+              <span>{v.name}:</span>
+              {v.compareAtPrice && v.compareAtPrice > v.price && (
+                <span className="line-through text-stone-400 text-[10px]">
+                  Rs. {v.compareAtPrice}
+                </span>
+              )}
+              <span className="text-brand-green font-bold">Rs. {v.price}</span>
             </span>
           ))}
         </div>
 
         <div className="mt-4 pt-3 border-t border-brand-green/10 flex items-center justify-between">
           <div>
-            <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">
-              Starting from
-            </p>
-            <p className="text-brand-green font-heading font-black text-xl">
-              Rs. {lowestPrice.toLocaleString()}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] text-brand-charcoal/50 uppercase font-bold tracking-wider">
+                {hasSale ? 'Sale Price' : 'Starting from'}
+              </p>
+              {hasSale && (
+                <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.2 rounded">
+                  Discounted
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <p className="text-brand-green font-heading font-black text-xl">
+                Rs. {lowestPrice.toLocaleString()}
+              </p>
+              {lowestComparePrice && lowestComparePrice > lowestPrice && (
+                <p className="line-through text-stone-400 text-xs sm:text-sm font-semibold">
+                  Rs. {lowestComparePrice.toLocaleString()}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

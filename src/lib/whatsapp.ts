@@ -24,11 +24,16 @@ export function generateWhatsAppMessage(items: CartItem[], customerName?: string
   items.forEach((item, index) => {
     const itemTotal = item.variant.price * item.quantity;
     subtotal += itemTotal;
+    const priceLine =
+      item.variant.compareAtPrice && item.variant.compareAtPrice > item.variant.price
+        ? `   Price: ~Rs. ${item.variant.compareAtPrice.toLocaleString()}~ Rs. ${item.variant.price.toLocaleString()} (Sale) × ${item.quantity} = Rs. ${itemTotal.toLocaleString()}`
+        : `   Price: Rs. ${item.variant.price.toLocaleString()} × ${item.quantity} = Rs. ${itemTotal.toLocaleString()}`;
+
     lines.push(
       `${index + 1}. ${item.product.name}`,
       `   Size: ${item.variant.name}`,
       `   Qty: ${item.quantity}`,
-      `   Price: Rs. ${item.variant.price.toLocaleString()} × ${item.quantity} = Rs. ${itemTotal.toLocaleString()}`,
+      priceLine,
       ''
     );
   });

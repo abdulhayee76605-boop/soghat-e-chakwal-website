@@ -188,12 +188,19 @@ export function CartDrawer() {
 
                         {/* Price */}
                         <div className="text-right">
-                          <p className="text-xs font-bold text-brand-charcoal">
+                          <p className="text-xs font-bold text-brand-green">
                             {formatPrice(item.variant.price * item.quantity)}
                           </p>
-                          <p className="text-[10px] text-brand-charcoal/50">
-                            {formatPrice(item.variant.price)} each
-                          </p>
+                          <div className="flex items-center justify-end gap-1 text-[10px]">
+                            {item.variant.compareAtPrice && item.variant.compareAtPrice > item.variant.price && (
+                              <span className="line-through text-stone-400">
+                                {formatPrice(item.variant.compareAtPrice)}
+                              </span>
+                            )}
+                            <span className="text-brand-charcoal/70 font-medium">
+                              {formatPrice(item.variant.price)} each
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>

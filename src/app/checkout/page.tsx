@@ -427,9 +427,14 @@ export default function CheckoutPage() {
                         </div>
                         <div>
                           <p className="font-semibold text-brand-charcoal">{item.product.name}</p>
-                          <p className="text-brand-charcoal/60">
-                            {item.variant.name} &times; {item.quantity}
-                          </p>
+                          <div className="flex items-center gap-1.5 text-brand-charcoal/60">
+                            <span>{item.variant.name} &times; {item.quantity}</span>
+                            {item.variant.compareAtPrice && item.variant.compareAtPrice > item.variant.price && (
+                              <span className="line-through text-stone-400 text-[10px]">
+                                {formatPrice(item.variant.compareAtPrice)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="font-bold text-brand-charcoal">

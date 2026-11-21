@@ -47,6 +47,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
       name: is1L ? '1 Liter' : '500ml',
       size: is1L ? '1L' : '500ml',
       price: is1L ? 700 : 350,
+      compareAtPrice: is1L ? 750 : 450,
       sku: is1L ? 'SEC-1L' : 'SEC-500ML',
       weight: is1L ? 1000 : 500,
       inStock: true,
@@ -279,11 +280,24 @@ export function ProductDetail({ product }: ProductDetailProps) {
             </div>
 
             {/* Price & Stock Display */}
-            <div className="flex items-baseline gap-4 pb-4 border-b border-brand-green/10">
-              <span className="font-heading text-3xl md:text-4xl font-extrabold text-brand-charcoal">
-                {formatPrice(selectedVariant.price)}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-brand-green/10">
+              <div className="flex items-baseline gap-2.5">
+                <span className="font-heading text-3xl md:text-4xl font-extrabold text-brand-green">
+                  {formatPrice(selectedVariant.price)}
+                </span>
+                {selectedVariant.compareAtPrice && selectedVariant.compareAtPrice > selectedVariant.price && (
+                  <span className="text-xl md:text-2xl font-bold line-through text-stone-400">
+                    {formatPrice(selectedVariant.compareAtPrice)}
+                  </span>
+                )}
+              </div>
+              {selectedVariant.compareAtPrice && selectedVariant.compareAtPrice > selectedVariant.price && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-red-600 text-white shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  SALE — Save {formatPrice(selectedVariant.compareAtPrice - selectedVariant.price)}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 sm:ml-auto">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                 In Stock ({selectedVariant.stockQuantity} units available)
               </span>
@@ -319,9 +333,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
                         White Screw Cap
                       </p>
                     </div>
-                    <span className={`font-bold text-sm ${is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                      Rs. 700
-                    </span>
+                    <div className="text-right">
+                      <span className={`block line-through text-[11px] font-semibold ${is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
+                        Rs. 750
+                      </span>
+                      <span className={`font-bold text-sm sm:text-base ${is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
+                        Rs. 700
+                      </span>
+                    </div>
                   </div>
                 </Link>
 
@@ -340,9 +359,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
                         Yellow Screw Cap
                       </p>
                     </div>
-                    <span className={`font-bold text-sm ${!is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                      Rs. 350
-                    </span>
+                    <div className="text-right">
+                      <span className={`block line-through text-[11px] font-semibold ${!is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
+                        Rs. 450
+                      </span>
+                      <span className={`font-bold text-sm sm:text-base ${!is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
+                        Rs. 350
+                      </span>
+                    </div>
                   </div>
                 </Link>
               </div>

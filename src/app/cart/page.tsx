@@ -146,9 +146,16 @@ export default function CartPage() {
                           <p className="text-xs text-brand-terracotta font-medium mt-0.5">
                             Size: {item.variant.name}
                           </p>
-                          <p className="text-xs text-brand-charcoal/60 sm:hidden mt-1">
-                            {formatPrice(item.variant.price)} each
-                          </p>
+                          <div className="flex items-center gap-1.5 text-xs text-brand-charcoal/60 mt-1">
+                            {item.variant.compareAtPrice && item.variant.compareAtPrice > item.variant.price && (
+                              <span className="line-through text-stone-400">
+                                {formatPrice(item.variant.compareAtPrice)}
+                              </span>
+                            )}
+                            <span className="text-brand-green font-semibold">
+                              {formatPrice(item.variant.price)} each
+                            </span>
+                          </div>
                         </div>
                       </div>
 

@@ -1393,6 +1393,11 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                             <span className="font-mono text-brand-green font-bold text-xs">
                               {formatPrice(v.price)}
                             </span>
+                            {v.compareAtPrice && v.compareAtPrice > v.price && (
+                              <span className="font-mono line-through text-stone-400 text-[10px]">
+                                {formatPrice(v.compareAtPrice)}
+                              </span>
+                            )}
                             <div className="flex items-center gap-1.5 ml-auto">
                               <span className="text-[10px] text-stone-500">Stock:</span>
                               <div className="inline-flex items-center border border-stone-300 rounded-lg overflow-hidden bg-white shadow-2xs">
