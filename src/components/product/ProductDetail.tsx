@@ -405,30 +405,39 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
             {/* Action Buttons */}
             <div className="space-y-3 pt-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <button
                   onClick={handleAddToCart}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-green text-brand-cream py-4 rounded-2xl font-semibold text-sm hover:bg-brand-green-light transition-all shadow-md active:scale-[0.99]"
+                  className="flex-1 flex items-center justify-center gap-2 bg-brand-green text-brand-cream py-3.5 sm:py-4 rounded-2xl font-semibold text-xs sm:text-sm hover:bg-brand-green-light transition-all shadow-md active:scale-[0.99]"
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  Add to Cart
+                  <span>Add to Cart</span>
                 </button>
                 <button
                   onClick={handleBuyNow}
-                  className="w-full flex items-center justify-center gap-2 bg-brand-gold text-brand-charcoal py-4 rounded-2xl font-bold text-sm hover:bg-brand-gold-dark transition-all shadow-md active:scale-[0.99]"
+                  className="flex-1 flex items-center justify-center gap-2 bg-brand-gold text-brand-charcoal py-3.5 sm:py-4 rounded-2xl font-bold text-xs sm:text-sm hover:bg-brand-gold-dark transition-all shadow-md active:scale-[0.99]"
                 >
                   <Zap className="w-4 h-4" />
-                  Buy Now
+                  <span>Buy Now</span>
+                </button>
+                {/* On mobile: Compact WhatsApp icon button right next to Add to Cart & Buy Now */}
+                <button
+                  onClick={handleWhatsAppOrder}
+                  className="sm:hidden p-3.5 bg-[#25D366] text-white rounded-2xl shadow-md hover:bg-[#20ba59] transition-all active:scale-95 flex items-center justify-center shrink-0"
+                  title="Order on WhatsApp"
+                  aria-label="Order on WhatsApp"
+                >
+                  <MessageCircle className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* WhatsApp Ordering Direct Button */}
+              {/* Desktop / Full width button (without phone number) */}
               <button
                 onClick={handleWhatsAppOrder}
-                className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white py-3.5 rounded-2xl font-semibold text-sm hover:bg-[#20ba59] transition-all shadow-md active:scale-[0.99]"
+                className="hidden sm:flex w-full items-center justify-center gap-2 bg-[#25D366] text-white py-3.5 rounded-2xl font-semibold text-sm hover:bg-[#20ba59] transition-all shadow-md active:scale-[0.99]"
               >
                 <MessageCircle className="w-5 h-5" />
-                Order Directly on WhatsApp (0300-8325693)
+                <span>Order on WhatsApp</span>
               </button>
               <p className="text-[11px] text-center text-brand-charcoal/60">
                 ⚡ Instant confirmation, no account required. Pay Cash on Delivery.

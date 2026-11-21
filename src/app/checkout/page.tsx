@@ -502,7 +502,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-brand-gold flex-shrink-0" />
-                    <span>Need help? WhatsApp 0300-8325693</span>
+                    <span>Need help? Chat with us on WhatsApp</span>
                   </div>
                 </div>
               </div>

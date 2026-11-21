@@ -150,7 +150,7 @@ export function Footer() {
                   rel="noopener noreferrer"
                   className="hover:text-[#25D366] transition-colors"
                 >
-                  WhatsApp: {siteConfig.whatsappNumber}
+                  Chat &amp; Order on WhatsApp
                 </a>
               </li>
               <li className="flex items-center gap-3">

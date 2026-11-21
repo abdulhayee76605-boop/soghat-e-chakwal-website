@@ -128,9 +128,9 @@ export function Header() {
                 href={siteConfig.whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Order or chat on WhatsApp"
+                aria-label="Order on WhatsApp"
                 className="flex p-2 rounded-full text-[#25D366] hover:bg-green-50 transition-colors"
-                title="Order on WhatsApp: 0300-8325693"
+                title="Order on WhatsApp"
               >
                 <MessageCircle className="w-5 h-5" />
               </a>
@@ -216,7 +216,7 @@ export function Header() {
                     className="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl font-semibold text-sm text-white bg-[#25D366] hover:bg-[#20ba59] transition-colors shadow-sm"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    Order via WhatsApp (0300-8325693)
+                    Order via WhatsApp
                   </a>
 
                   <Link
@@ -234,7 +234,7 @@ export function Header() {
                 <p className="font-serif italic text-brand-terracotta mb-1">
                   &ldquo;Wohi Purana Desi Zaiqa, Ab Har Ghar Mein!&rdquo;
                 </p>
-                <p>Official WhatsApp: 0300-8325693</p>
+                <p>Official WhatsApp Helpline</p>
               </div>
             </motion.div>
           </>

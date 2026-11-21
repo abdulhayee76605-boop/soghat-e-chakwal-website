@@ -191,10 +191,12 @@ export default function HeroSection() {
                   href={activeBanner.secondaryCta.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hidden sm:inline-flex items-center gap-2 bg-[#25D366]/90 hover:bg-[#25D366] text-white px-5 sm:px-6 py-2.5 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md transition-all hover:scale-105"
+                  className="inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white p-2 sm:px-6 sm:py-3.5 rounded-full font-bold text-xs sm:text-sm shadow-xl backdrop-blur-md transition-all hover:scale-105 active:scale-95"
+                  title={activeBanner.secondaryCta.text}
+                  aria-label={activeBanner.secondaryCta.text}
                 >
                   <activeBanner.secondaryCta.icon className="w-4 h-4" />
-                  {activeBanner.secondaryCta.text}
+                  <span className="hidden sm:inline">{activeBanner.secondaryCta.text}</span>
                 </a>
               ) : (
                 <Link
