@@ -141,7 +141,10 @@ export function saveNewOrder(orderData: {
   paymentMethod: Order['paymentMethod'];
   subtotal: number;
   shipping: number;
+  discount?: number;
   total: number;
+  notes?: string;
+  source?: string;
 }): Order {
   const orderNumber = `SEC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   const newOrder: Order = {
@@ -152,7 +155,7 @@ export function saveNewOrder(orderData: {
     status: 'pending',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    notes: orderData.customer?.notes,
+    notes: orderData.notes || orderData.customer?.notes,
   };
 
   // 1. Save to local storage

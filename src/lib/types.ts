@@ -112,10 +112,12 @@ export interface Order {
   status: OrderStatus;
   subtotal: number;
   shipping: number;
+  discount?: number;
   total: number;
   createdAt: string;
   updatedAt: string;
   notes?: string;
+  source?: string;
 }
 
 export interface SiteConfig {

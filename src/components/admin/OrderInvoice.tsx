@@ -406,9 +406,12 @@ Helpline / WhatsApp: 0300-8325693
                       </p>
                     ))}
                   </div>
-                  <div className="pt-1 flex justify-between text-[11px] text-stone-600 font-medium">
+                  <div className="pt-1 flex flex-wrap justify-between text-[11px] text-stone-600 font-medium gap-x-2">
                     <span>Shipping: {order.shipping === 0 ? 'FREE' : formatPrice(order.shipping)}</span>
-                    <span className="font-bold">Total: {formatPrice(order.total)}</span>
+                    {order.discount && order.discount > 0 ? (
+                      <span className="text-red-600 font-bold">Discount: -{formatPrice(order.discount)}</span>
+                    ) : null}
+                    <span className="font-bold text-stone-900">Total: {formatPrice(order.total)}</span>
                   </div>
                 </div>
               </div>
@@ -604,6 +607,12 @@ Helpline / WhatsApp: 0300-8325693
                     <span>Subtotal:</span>
                     <span className="font-mono font-semibold">{formatPrice(order.subtotal)}</span>
                   </div>
+                  {order.discount && order.discount > 0 ? (
+                    <div className="flex justify-between text-red-600 font-medium">
+                      <span>Special Discount:</span>
+                      <span className="font-mono font-bold">-{formatPrice(order.discount)}</span>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between text-stone-600">
                     <span>Delivery &amp; Handling:</span>
                     <span className="font-mono font-semibold">

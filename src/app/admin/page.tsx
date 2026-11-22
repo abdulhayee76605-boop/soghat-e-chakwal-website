@@ -44,7 +44,7 @@ import {
   Bell,
   Mail,
 } from 'lucide-react';
-import { Product, Order, OrderStatus, PaymentStatus } from '@/lib/types';
+import { Product, Order, OrderStatus, PaymentStatus, CartItem, ProductVariant } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
@@ -78,15 +78,21 @@ export default function AdminPage() {
   const [invoiceMode, setInvoiceMode] = useState<'label' | 'invoice'>('label');
   const [funnel, setFunnel] = useState<FunnelMetrics>(getFunnelMetrics());
 
-  // Manual Order Creation State
+  // Manual / Custom WhatsApp Order Creation State
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualCity, setManualCity] = useState('Chakwal');
   const [manualAddress, setManualAddress] = useState('');
-  const [manualProductChoice, setManualProductChoice] = useState<'1l' | '500ml'>('1l');
-  const [manualQty, setManualQty] = useState(1);
+  const [manualNotes, setManualNotes] = useState('');
+  const [manualItems, setManualItems] = useState<
+    { id: string; variantChoice: '1l' | '500ml'; customPrice: number; qty: number }[]
+  >([{ id: 'item-1', variantChoice: '1l', customPrice: 700, qty: 1 }]);
+  const [manualShippingMode, setManualShippingMode] = useState<'standard' | 'free' | 'custom'>('standard');
+  const [manualCustomShipping, setManualCustomShipping] = useState<number>(0);
+  const [manualDiscount, setManualDiscount] = useState<number>(0);
   const [manualPayment, setManualPayment] = useState<'cod' | 'bank_transfer'>('cod');
+  const [manualPaymentStatus, setManualPaymentStatus] = useState<PaymentStatus>('pending');
 
   // Form states
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -256,54 +262,161 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     saveProductList(updated);
   };
 
+  const handleAddManualItemRow = () => {
+    setManualItems((prev) => [
+      ...prev,
+      {
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        variantChoice: '1l',
+        customPrice: 700,
+        qty: 1,
+      },
+    ]);
+  };
+
+  const handleRemoveManualItemRow = (id: string) => {
+    if (manualItems.length <= 1) return;
+    setManualItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleUpdateManualItem = (
+    id: string,
+    field: 'variantChoice' | 'customPrice' | 'qty',
+    value: string | number
+  ) => {
+    setManualItems((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          if (field === 'variantChoice') {
+            const newChoice = value as '1l' | '500ml';
+            const autoPrice = newChoice === '1l' ? 700 : 350;
+            return { ...item, variantChoice: newChoice, customPrice: autoPrice };
+          }
+          return { ...item, [field]: value };
+        }
+        return item;
+      })
+    );
+  };
+
+  // Computed live financial totals for the manual order modal
+  const computedManualSubtotal = manualItems.reduce(
+    (sum, item) => sum + (Number(item.customPrice) || 0) * (Number(item.qty) || 1),
+    0
+  );
+  const computedManualLiters = manualItems.reduce(
+    (sum, item) => sum + (item.variantChoice === '1l' ? 1 : 0.5) * (Number(item.qty) || 1),
+    0
+  );
+  const computedManualDiscount = Math.max(0, Number(manualDiscount) || 0);
+  const computedManualShipping =
+    manualShippingMode === 'free'
+      ? 0
+      : manualShippingMode === 'custom'
+      ? Math.max(0, Number(manualCustomShipping) || 0)
+      : (computedManualLiters >= 3 || computedManualSubtotal >= freeShippingMin ? 0 : shippingRate);
+  const computedManualTotal = Math.max(0, computedManualSubtotal - computedManualDiscount) + computedManualShipping;
+
   const handleCreateManualOrder = (e: React.FormEvent) => {
     e.preventDefault();
-    const is1L = manualProductChoice === '1l';
-    const unitPrice = is1L ? 700 : 350;
-    const subtotal = unitPrice * manualQty;
-    const totalLiters = (is1L ? 1 : 0.5) * manualQty;
-    const shipping = (totalLiters >= 3 || subtotal >= freeShippingMin) ? 0 : shippingRate;
-    const total = subtotal + shipping;
+    if (!manualName.trim() || !manualPhone.trim() || !manualAddress.trim()) {
+      alert('Please fill customer full name, phone and complete delivery address.');
+      return;
+    }
 
-    const prod = productList[is1L ? 0 : 1] || initialProducts[0];
-    const variant = prod.variants[is1L ? 0 : 1] || prod.variants[0];
+    const prod1L = productList.find((p) => p.slug.includes('1-liter') || p.name.includes('1 Liter')) || initialProducts[0];
+    const prod500ml = productList.find((p) => p.slug.includes('500ml') || p.name.includes('500ml')) || initialProducts[1] || initialProducts[0];
+
+    let subtotal = 0;
+    let totalLiters = 0;
+
+    const cartItems: CartItem[] = manualItems.map((item, idx) => {
+      const is1L = item.variantChoice === '1l';
+      const prod = is1L ? prod1L : prod500ml;
+      const baseVariant = prod.variants[0];
+      const customUnitPrice = Math.max(0, Number(item.customPrice) || (is1L ? 700 : 350));
+      const qty = Math.max(1, Number(item.qty) || 1);
+
+      subtotal += customUnitPrice * qty;
+      totalLiters += (is1L ? 1 : 0.5) * qty;
+
+      const variant: ProductVariant = {
+        ...baseVariant,
+        id: `custom-var-${idx}-${Date.now()}`,
+        name: is1L ? '1 Liter Bottle' : '500ml Bottle',
+        size: is1L ? '1L' : '500ml',
+        price: customUnitPrice,
+        compareAtPrice: is1L ? 750 : 450,
+      };
+
+      return {
+        productId: prod.id,
+        variantId: variant.id,
+        quantity: qty,
+        product: prod,
+        variant: variant,
+      };
+    });
+
+    const discountAmount = Math.max(0, Number(manualDiscount) || 0);
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+
+    let shippingFee = 0;
+    if (manualShippingMode === 'free') {
+      shippingFee = 0;
+    } else if (manualShippingMode === 'custom') {
+      shippingFee = Math.max(0, Number(manualCustomShipping) || 0);
+    } else {
+      shippingFee = (totalLiters >= 3 || subtotal >= freeShippingMin) ? 0 : shippingRate;
+    }
+
+    const total = discountedSubtotal + shippingFee;
 
     const newOrder = saveNewOrder({
-      items: [
-        {
-          productId: prod.id,
-          variantId: variant.id,
-          quantity: manualQty,
-          product: prod,
-          variant: variant,
-        },
-      ],
+      items: cartItems,
       customer: {
-        fullName: manualName,
-        phone: manualPhone,
-        whatsapp: manualPhone,
-        address: manualAddress,
-        city: manualCity,
+        fullName: manualName.trim(),
+        phone: manualPhone.trim(),
+        whatsapp: manualPhone.trim(),
+        address: manualAddress.trim(),
+        city: manualCity.trim() || 'Chakwal',
         province: 'Punjab',
+        notes: manualNotes.trim() || undefined,
       },
       paymentMethod: manualPayment,
       subtotal,
-      shipping,
+      shipping: shippingFee,
+      discount: discountAmount > 0 ? discountAmount : undefined,
       total,
+      notes: manualNotes.trim() || undefined,
+      source: 'whatsapp',
     });
+
+    if (manualPaymentStatus === 'received') {
+      newOrder.paymentStatus = 'received';
+      updateStoredPaymentStatus(newOrder.id, 'received');
+    }
 
     setOrders((prev) => [newOrder, ...prev]);
     setShowAddOrderModal(false);
+
+    // Reset form fields
     setManualName('');
     setManualPhone('');
     setManualAddress('');
-    
+    setManualCity('Chakwal');
+    setManualNotes('');
+    setManualDiscount(0);
+    setManualShippingMode('standard');
+    setManualCustomShipping(0);
+    setManualItems([{ id: Date.now().toString(), variantChoice: '1l', customPrice: 700, qty: 1 }]);
+
     // Automatically trigger notification (Email, SMS & WhatsApp)
     triggerNotificationDispatch(newOrder, 'order_placed').catch(() => {});
-    setNotificationToast(`Order created & notification sent to ${newOrder.customer.fullName}`);
+    setNotificationToast(`Custom WhatsApp order created for ${newOrder.customer.fullName}!`);
     setTimeout(() => setNotificationToast(null), 3500);
 
-    // Automatically open invoice for immediate printing
+    // Automatically open invoice for immediate printing / PDF save
     setInvoiceOrder(newOrder);
   };
 
@@ -1702,134 +1815,343 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           </div>
         )}
 
-        {/* ── Manual Order Modal ── */}
+        {/* ── Custom WhatsApp / Manual Order Modal ── */}
         {showAddOrderModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-4 shadow-2xl border border-stone-200">
-              <div className="flex justify-between items-center border-b pb-3">
-                <h4 className="font-heading font-bold text-lg text-brand-green flex items-center gap-2">
-                  <Plus className="w-5 h-5 text-brand-gold" />
-                  Create Manual / WhatsApp Order
-                </h4>
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-2xl w-full space-y-4 shadow-2xl border border-stone-200 my-auto max-h-[92vh] overflow-y-auto">
+              <div className="flex justify-between items-center border-b pb-3 sticky top-0 bg-white z-10">
+                <div>
+                  <h4 className="font-heading font-bold text-lg sm:text-xl text-brand-green flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-[#25D366]" />
+                    Create Custom / WhatsApp Order
+                  </h4>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Generate instant invoices &amp; parcel dispatch slips with custom rates, discounts, or free delivery.
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowAddOrderModal(false)}
-                  className="text-stone-400 hover:text-stone-700 text-sm font-bold"
+                  className="text-stone-400 hover:text-stone-700 text-sm font-bold p-1 rounded-lg"
                 >
                   &times; Close
                 </button>
               </div>
 
-              <form onSubmit={handleCreateManualOrder} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Customer Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={manualName}
-                    onChange={(e) => setManualName(e.target.value)}
-                    placeholder="e.g. Usman Tariq"
-                    className="w-full px-3.5 py-2.5 border rounded-xl"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">Phone / WhatsApp *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={manualPhone}
-                      onChange={(e) => setManualPhone(e.target.value)}
-                      placeholder="0300 1234567"
-                      className="w-full px-3.5 py-2.5 border rounded-xl"
-                    />
+              <form onSubmit={handleCreateManualOrder} className="space-y-4 text-xs">
+                {/* 1. Customer Information */}
+                <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 space-y-3">
+                  <h5 className="font-bold text-stone-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-brand-green" />
+                    Customer &amp; Delivery Information
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-stone-700 block mb-1">Customer Full Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualName}
+                        onChange={(e) => setManualName(e.target.value)}
+                        placeholder="e.g. Usman Tariq"
+                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-stone-700 block mb-1">Phone / WhatsApp Number *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={manualPhone}
+                        onChange={(e) => setManualPhone(e.target.value)}
+                        placeholder="0300 1234567"
+                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-mono"
+                      />
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-stone-700 block mb-1">City *</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualCity}
+                        onChange={(e) => setManualCity(e.target.value)}
+                        placeholder="e.g. Chakwal, Rawalpindi"
+                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="font-bold text-stone-700 block mb-1">Complete Delivery Address *</label>
+                      <input
+                        type="text"
+                        required
+                        value={manualAddress}
+                        onChange={(e) => setManualAddress(e.target.value)}
+                        placeholder="House / Shop #, Street, Mohallah / Sector"
+                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="font-bold text-stone-700 block mb-1">City *</label>
+                    <label className="font-bold text-stone-700 block mb-1">
+                      Order / Landmark Notes <span className="text-stone-400 font-normal">(Optional)</span>
+                    </label>
                     <input
                       type="text"
-                      required
-                      value={manualCity}
-                      onChange={(e) => setManualCity(e.target.value)}
-                      placeholder="e.g. Chakwal, Rawalpindi"
-                      className="w-full px-3.5 py-2.5 border rounded-xl"
+                      value={manualNotes}
+                      onChange={(e) => setManualNotes(e.target.value)}
+                      placeholder="e.g. Special deal via WhatsApp, deliver after 4 PM"
+                      className="w-full px-3 py-2 border rounded-xl bg-white text-xs"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Complete Delivery Address *</label>
-                  <textarea
-                    rows={2}
-                    required
-                    value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
-                    placeholder="House / Shop #, Street, Mohallah / Sector"
-                    className="w-full px-3.5 py-2.5 border rounded-xl"
-                  />
+                {/* 2. Products & Custom Pricing Rows */}
+                <div className="bg-amber-50/50 p-3.5 rounded-2xl border border-amber-200/80 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h5 className="font-bold text-amber-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-amber-700" />
+                      Order Items &amp; Custom Unit Pricing
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={handleAddManualItemRow}
+                      className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shadow-2xs transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      + Add Item Row
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {manualItems.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className="bg-white p-3 rounded-xl border border-stone-200 shadow-2xs grid grid-cols-12 gap-2 items-center"
+                      >
+                        <div className="col-span-12 sm:col-span-5">
+                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
+                            Product #{idx + 1}
+                          </label>
+                          <select
+                            value={item.variantChoice}
+                            onChange={(e) =>
+                              handleUpdateManualItem(item.id, 'variantChoice', e.target.value)
+                            }
+                            className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs font-medium"
+                          >
+                            <option value="1l">1 Liter Bottle (Base: Rs. 700)</option>
+                            <option value="500ml">500ml Bottle (Base: Rs. 350)</option>
+                          </select>
+                        </div>
+
+                        <div className="col-span-4 sm:col-span-2">
+                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={item.qty}
+                            onChange={(e) =>
+                              handleUpdateManualItem(item.id, 'qty', Number(e.target.value) || 1)
+                            }
+                            className="w-full px-2 py-1.5 border rounded-lg text-center font-bold text-xs"
+                          />
+                        </div>
+
+                        <div className="col-span-5 sm:col-span-3">
+                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
+                            Custom Rate (PKR)
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1.5 text-stone-400 font-bold text-[10px]">Rs.</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.customPrice}
+                              onChange={(e) =>
+                                handleUpdateManualItem(item.id, 'customPrice', Number(e.target.value))
+                              }
+                              className="w-full pl-8 pr-2 py-1.5 border rounded-lg font-bold text-xs text-brand-green"
+                              title="Enter custom price per bottle agreed on WhatsApp"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="col-span-3 sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0">
+                          <div className="text-right">
+                            <span className="text-[9px] text-stone-400 block sm:hidden">Total:</span>
+                            <span className="font-mono font-bold text-xs text-stone-800">
+                              {formatPrice(item.customPrice * item.qty)}
+                            </span>
+                          </div>
+                          {manualItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveManualItemRow(item.id)}
+                              className="text-stone-400 hover:text-red-600 p-1 rounded-md"
+                              title="Remove item"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* 3. Shipping & Discount Controls */}
+                <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Shipping Choice */}
+                  <div className="space-y-2">
+                    <label className="font-bold text-stone-700 block text-[11px] flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-brand-green" />
+                      Delivery / Shipping Fee
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setManualShippingMode('free')}
+                        className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all text-center ${
+                          manualShippingMode === 'free'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-white text-stone-700 border-stone-200 hover:border-emerald-500'
+                        }`}
+                      >
+                        🎉 FREE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualShippingMode('standard')}
+                        className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all text-center ${
+                          manualShippingMode === 'standard'
+                            ? 'bg-brand-green text-white border-brand-green shadow-xs'
+                            : 'bg-white text-stone-700 border-stone-200 hover:border-brand-green'
+                        }`}
+                      >
+                        Standard
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualShippingMode('custom')}
+                        className={`py-2 px-2 rounded-xl text-[11px] font-bold border transition-all text-center ${
+                          manualShippingMode === 'custom'
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-stone-700 border-stone-200 hover:border-amber-500'
+                        }`}
+                      >
+                        Custom Fee
+                      </button>
+                    </div>
+
+                    {manualShippingMode === 'custom' && (
+                      <div className="pt-1">
+                        <label className="text-[10px] text-stone-500 block mb-0.5">Custom Shipping Fee (PKR):</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={manualCustomShipping}
+                          onChange={(e) => setManualCustomShipping(Number(e.target.value) || 0)}
+                          className="w-full px-3 py-1.5 border rounded-xl bg-white font-bold text-xs"
+                          placeholder="e.g. 150"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Special Deal Discount */}
+                  <div className="space-y-2">
+                    <label className="font-bold text-stone-700 block text-[11px] flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-red-600" />
+                      Special Deal Discount (PKR)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-stone-400 font-bold text-xs">Rs.</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={manualDiscount}
+                        onChange={(e) => setManualDiscount(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full pl-9 pr-3 py-1.5 border rounded-xl bg-white font-bold text-xs text-red-600"
+                      />
+                    </div>
+                    <p className="text-[10px] text-stone-500">
+                      Subtracted directly from items subtotal on the customer invoice.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. Payment Method & Status */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-stone-700 block mb-1">Product Variant</label>
+                    <label className="font-bold text-stone-700 block mb-1">Payment Method</label>
                     <select
-                      value={manualProductChoice}
-                      onChange={(e) => setManualProductChoice(e.target.value as '1l' | '500ml')}
-                      className="w-full px-3.5 py-2.5 border rounded-xl bg-white"
+                      value={manualPayment}
+                      onChange={(e) => setManualPayment(e.target.value as 'cod' | 'bank_transfer')}
+                      className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-medium"
                     >
-                      <option value="1l">1 Liter Bottle (Rs. 700)</option>
-                      <option value="500ml">500ml Bottle (Rs. 350)</option>
+                      <option value="cod">Cash on Delivery (COD)</option>
+                      <option value="bank_transfer">Direct Bank Transfer / EasyPaisa</option>
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-stone-700 block mb-1">Quantity</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={50}
-                      value={manualQty}
-                      onChange={(e) => setManualQty(Number(e.target.value) || 1)}
-                      className="w-full px-3.5 py-2.5 border rounded-xl"
-                    />
+                    <label className="font-bold text-stone-700 block mb-1">Payment Status</label>
+                    <select
+                      value={manualPaymentStatus}
+                      onChange={(e) => setManualPaymentStatus(e.target.value as PaymentStatus)}
+                      className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-medium"
+                    >
+                      <option value="pending">Pending (To Collect on Delivery)</option>
+                      <option value="received">Received / Already Paid</option>
+                    </select>
                   </div>
                 </div>
 
-                <div>
-                  <label className="font-bold text-stone-700 block mb-1">Payment Method</label>
-                  <select
-                    value={manualPayment}
-                    onChange={(e) => setManualPayment(e.target.value as 'cod' | 'bank_transfer')}
-                    className="w-full px-3.5 py-2.5 border rounded-xl bg-white"
-                  >
-                    <option value="cod">Cash on Delivery (COD)</option>
-                    <option value="bank_transfer">Direct Bank Transfer</option>
-                  </select>
+                {/* 5. Live Summary Box */}
+                <div className="bg-emerald-950 text-emerald-100 p-4 rounded-2xl space-y-1.5 shadow-md">
+                  <div className="flex justify-between text-xs text-emerald-300">
+                    <span>Items Subtotal:</span>
+                    <span className="font-mono font-bold">{formatPrice(computedManualSubtotal)}</span>
+                  </div>
+                  {computedManualDiscount > 0 && (
+                    <div className="flex justify-between text-xs text-amber-300">
+                      <span>Special Discount:</span>
+                      <span className="font-mono font-bold">-{formatPrice(computedManualDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs text-emerald-300">
+                    <span>Shipping / Delivery:</span>
+                    <span className="font-mono font-bold">
+                      {computedManualShipping === 0 ? 'FREE (Rs. 0)' : formatPrice(computedManualShipping)}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-emerald-800 flex justify-between items-center text-white">
+                    <span className="font-black text-sm uppercase tracking-wide">Net Amount To Collect:</span>
+                    <span className="font-mono font-black text-xl text-brand-gold">
+                      {formatPrice(computedManualTotal)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="bg-brand-ivory p-3.5 rounded-xl border border-brand-green/10 flex justify-between items-center text-xs">
-                  <span className="font-semibold text-stone-700">Total Payable (with Shipping):</span>
-                  <span className="font-black font-mono text-base text-brand-green">
-                    {formatPrice(
-                      (manualProductChoice === '1l' ? 700 : 350) * manualQty +
-                        (((manualProductChoice === '1l' ? 1 : 0.5) * manualQty >= 3 ||
-                          (manualProductChoice === '1l' ? 700 : 350) * manualQty >= freeShippingMin)
-                          ? 0
-                          : shippingRate)
-                    )}
-                  </span>
-                </div>
-
+                {/* 6. Buttons */}
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light transition-all shadow-sm"
+                    className="flex-1 bg-brand-green text-brand-cream py-3 rounded-xl font-bold hover:bg-brand-green-light transition-all shadow-md flex items-center justify-center gap-2"
                   >
-                    Save &amp; Generate Invoice
+                    <Printer className="w-4 h-4 text-brand-gold" />
+                    Save &amp; Generate Custom Invoice
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAddOrderModal(false)}
-                    className="bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200 transition-colors"
+                    className="bg-stone-100 text-stone-600 px-5 py-3 rounded-xl font-semibold hover:bg-stone-200 transition-colors"
                   >
                     Cancel
                   </button>
