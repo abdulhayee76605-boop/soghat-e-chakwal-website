@@ -210,3 +210,19 @@ export function updateStoredPaymentStatus(orderId: string, paymentStatus: Paymen
     }
   }
 }
+
+export function updateStoredOrder(updatedOrder: Order): void {
+  if (typeof window !== 'undefined') {
+    try {
+      const orders = getStoredOrders().map((o) => (o.id === updatedOrder.id ? updatedOrder : o));
+      localStorage.setItem('sec_orders', JSON.stringify(orders));
+      fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: updatedOrder.id, order: updatedOrder }),
+      }).catch(() => {});
+    } catch {
+      // Fallback
+    }
+  }
+}

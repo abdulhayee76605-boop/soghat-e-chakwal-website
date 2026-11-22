@@ -24,13 +24,25 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { orderId, status, paymentStatus } = await request.json();
+    const payload = await request.json();
+    const { orderId, order } = payload;
+    const targetId = orderId || (order && order.id);
+
     serverOrders = serverOrders.map((o) => {
-      if (o.id === orderId) {
+      if (o.id === targetId) {
+        if (order) {
+          return { ...o, ...order, updatedAt: new Date().toISOString() };
+        }
         return {
           ...o,
-          ...(status ? { status } : {}),
-          ...(paymentStatus ? { paymentStatus } : {}),
+          ...(payload.status ? { status: payload.status } : {}),
+          ...(payload.paymentStatus ? { paymentStatus: payload.paymentStatus } : {}),
+          ...(payload.items ? { items: payload.items } : {}),
+          ...(payload.subtotal !== undefined ? { subtotal: payload.subtotal } : {}),
+          ...(payload.shipping !== undefined ? { shipping: payload.shipping } : {}),
+          ...(payload.discount !== undefined ? { discount: payload.discount } : {}),
+          ...(payload.total !== undefined ? { total: payload.total } : {}),
+          ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
           updatedAt: new Date().toISOString(),
         };
       }

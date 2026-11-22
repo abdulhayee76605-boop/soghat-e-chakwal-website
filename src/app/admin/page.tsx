@@ -43,6 +43,7 @@ import {
   Send,
   Bell,
   Mail,
+  Edit3,
 } from 'lucide-react';
 import { Product, Order, OrderStatus, PaymentStatus, CartItem, ProductVariant } from '@/lib/types';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
@@ -76,6 +77,7 @@ export default function AdminPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
   const [invoiceMode, setInvoiceMode] = useState<'label' | 'invoice'>('label');
+  const [invoiceEditMode, setInvoiceEditMode] = useState<boolean>(false);
   const [funnel, setFunnel] = useState<FunnelMetrics>(getFunnelMetrics());
 
   // Manual / Custom WhatsApp Order Creation State
@@ -1054,6 +1056,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               <button
                                 onClick={() => {
                                   setInvoiceMode('label');
+                                  setInvoiceEditMode(false);
                                   setInvoiceOrder(o);
                                 }}
                                 className="inline-flex items-center gap-1 text-[11px] bg-brand-green/10 hover:bg-brand-green hover:text-white text-brand-green px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
@@ -1065,6 +1068,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               <button
                                 onClick={() => {
                                   setInvoiceMode('invoice');
+                                  setInvoiceEditMode(false);
                                   setInvoiceOrder(o);
                                 }}
                                 className="inline-flex items-center gap-1 text-[11px] bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
@@ -1072,6 +1076,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               >
                                 <Printer className="w-3 h-3" />
                                 Invoice
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setInvoiceMode('invoice');
+                                  setInvoiceEditMode(true);
+                                  setInvoiceOrder(o);
+                                }}
+                                className="inline-flex items-center gap-1 text-[11px] bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-900 border border-amber-300 px-2.5 py-1 rounded-md font-bold transition-all shadow-2xs"
+                                title="Edit rate (e.g. Rs. 650/L) or customize delivery & discount on this bill"
+                              >
+                                <Edit3 className="w-3 h-3 text-amber-600" />
+                                ✏️ Custom Rate
                               </button>
                             </div>
                           </td>
@@ -1265,6 +1281,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               <button
                                 onClick={() => {
                                   setInvoiceMode('label');
+                                  setInvoiceEditMode(false);
                                   setInvoiceOrder(order);
                                 }}
                                 className="inline-flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
@@ -1276,6 +1293,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               <button
                                 onClick={() => {
                                   setInvoiceMode('invoice');
+                                  setInvoiceEditMode(false);
                                   setInvoiceOrder(order);
                                 }}
                                 className="inline-flex items-center gap-1 text-xs bg-brand-gold/25 hover:bg-brand-gold text-brand-charcoal px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
@@ -1283,6 +1301,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               >
                                 <Printer className="w-3.5 h-3.5" />
                                 Invoice
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setInvoiceMode('invoice');
+                                  setInvoiceEditMode(true);
+                                  setInvoiceOrder(order);
+                                }}
+                                className="inline-flex items-center gap-1 text-xs bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-900 border border-amber-300 px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
+                                title="Edit rate (e.g. Rs. 650/L) or customize delivery & discount on this bill"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                                ✏️ Custom Rate
                               </button>
                             </div>
                           </td>
@@ -1931,8 +1961,8 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                         key={item.id}
                         className="bg-white p-3 rounded-xl border border-stone-200 shadow-2xs grid grid-cols-12 gap-2 items-center"
                       >
-                        <div className="col-span-12 sm:col-span-5">
-                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="text-[10px] font-bold text-stone-600 block mb-0.5">
                             Product #{idx + 1}
                           </label>
                           <select
@@ -1948,7 +1978,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                         </div>
 
                         <div className="col-span-4 sm:col-span-2">
-                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
+                          <label className="text-[10px] font-bold text-stone-600 block mb-0.5">
                             Qty
                           </label>
                           <input
@@ -1963,12 +1993,12 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                           />
                         </div>
 
-                        <div className="col-span-5 sm:col-span-3">
-                          <label className="text-[10px] font-bold text-stone-500 block mb-0.5">
-                            Custom Rate (PKR)
+                        <div className="col-span-8 sm:col-span-4">
+                          <label className="text-[10px] font-bold text-stone-700 block mb-0.5">
+                            Custom Rate (PKR) — e.g. 650
                           </label>
                           <div className="relative">
-                            <span className="absolute left-2 top-1.5 text-stone-400 font-bold text-[10px]">Rs.</span>
+                            <span className="absolute left-2.5 top-1.5 text-stone-400 font-bold text-xs">Rs.</span>
                             <input
                               type="number"
                               min={0}
@@ -1976,13 +2006,89 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               onChange={(e) =>
                                 handleUpdateManualItem(item.id, 'customPrice', Number(e.target.value))
                               }
-                              className="w-full pl-8 pr-2 py-1.5 border rounded-lg font-bold text-xs text-brand-green"
+                              className="w-full pl-9 pr-2 py-1.5 border-2 border-emerald-500 rounded-lg font-bold text-xs text-brand-green bg-white shadow-2xs"
+                              placeholder="e.g. 650"
                               title="Enter custom price per bottle agreed on WhatsApp"
                             />
                           </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.variantChoice === '1l' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 650)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all ${
+                                    item.customPrice === 650
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  🔥 650 (WhatsApp)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 600)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                    item.customPrice === 600
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  600
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 700)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                    item.customPrice === 700
+                                      ? 'bg-stone-800 text-white border-stone-800'
+                                      : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+                                  }`}
+                                >
+                                  700
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 320)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all ${
+                                    item.customPrice === 320
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  🔥 320 (WhatsApp)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 300)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                    item.customPrice === 300
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  300
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 350)}
+                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                    item.customPrice === 350
+                                      ? 'bg-stone-800 text-white border-stone-800'
+                                      : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+                                  }`}
+                                >
+                                  350
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="col-span-3 sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0">
+                        <div className="col-span-12 sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0">
                           <div className="text-right">
                             <span className="text-[9px] text-stone-400 block sm:hidden">Total:</span>
                             <span className="font-mono font-bold text-xs text-stone-800">
@@ -2165,8 +2271,20 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
         {invoiceOrder && (
           <OrderInvoice
             order={invoiceOrder}
-            onClose={() => setInvoiceOrder(null)}
+            onClose={() => {
+              setInvoiceOrder(null);
+              setInvoiceEditMode(false);
+            }}
             defaultMode={invoiceMode}
+            initialEditMode={invoiceEditMode}
+            onUpdateOrder={(updatedOrder) => {
+              setOrders((prev) =>
+                prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+              );
+              setInvoiceOrder(updatedOrder);
+              setNotificationToast(`Bill updated for ${updatedOrder.orderNumber}! Net total: Rs. ${updatedOrder.total}`);
+              setTimeout(() => setNotificationToast(null), 3000);
+            }}
           />
         )}
       </main>
