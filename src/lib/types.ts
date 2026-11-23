@@ -188,7 +188,15 @@ export interface ExpenseEntry {
 export interface FinancialSettings {
   defaultCostPrice1L: number;    // Wholesale / Purchase cost per 1L bottle (e.g. 480 PKR)
   defaultCostPrice500ml: number; // Wholesale / Purchase cost per 500ml bottle (e.g. 240 PKR)
-  monthlyWholesaleRates?: Record<string, { cost1L: number; cost500ml: number }>; // Custom rate per month, e.g. { "2026-11": { cost1L: 480, cost500ml: 240 } }
+  variantCosts?: Record<string, number>; // variantId -> default wholesale purchase cost in PKR
+  monthlyWholesaleRates?: Record<
+    string,
+    {
+      cost1L?: number;
+      cost500ml?: number;
+      variantRates?: Record<string, number>; // variantId -> wholesale purchase rate for that specific month
+    }
+  >;
   packagingCostPerOrder?: number;
   courierCostPerOrder?: number;
 }

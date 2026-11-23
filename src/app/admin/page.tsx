@@ -103,7 +103,7 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState(false);
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'categories' | 'reports' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'categories' | 'wholesale' | 'reports' | 'settings'>('overview');
 
   // Financial & Expense States (P&L, Wholesale, Ad Costs, Packaging, Delivery)
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
@@ -146,8 +146,8 @@ export default function AdminPage() {
   const [manualAddress, setManualAddress] = useState('');
   const [manualNotes, setManualNotes] = useState('');
   const [manualItems, setManualItems] = useState<
-    { id: string; variantChoice: '1l' | '500ml'; customPrice: number; qty: number }[]
-  >([{ id: 'item-1', variantChoice: '1l', customPrice: 700, qty: 1 }]);
+    { id: string; variantChoice: string; customPrice: number; qty: number }[]
+  >([{ id: 'item-1', variantChoice: 'var-1l', customPrice: 700, qty: 1 }]);
   const [manualShippingMode, setManualShippingMode] = useState<'standard' | 'free' | 'custom'>('standard');
   const [manualCustomShipping, setManualCustomShipping] = useState<number>(0);
   const [manualDiscount, setManualDiscount] = useState<number>(0);
@@ -269,7 +269,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
         const storedProds = localStorage.getItem('sec_products');
         if (storedProds) {
-          setProductList(JSON.parse(storedProds));
+          try {
+            const parsed = JSON.parse(storedProds) as Product[];
+            const existingIds = new Set(parsed.map((p) => p.id));
+            const missingSeed = initialProducts.filter((p) => !existingIds.has(p.id));
+            const merged = [...parsed, ...missingSeed];
+            setProductList(merged);
+            localStorage.setItem('sec_products', JSON.stringify(merged));
+          } catch {
+            setProductList(initialProducts);
+          }
+        } else {
+          setProductList(initialProducts);
         }
       } catch {}
     }
@@ -323,12 +334,14 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
   };
 
   const handleAddManualItemRow = () => {
+    const firstVariantId = productList[0]?.variants[0]?.id || 'var-1l';
+    const firstVariantPrice = productList[0]?.variants[0]?.price || 700;
     setManualItems((prev) => [
       ...prev,
       {
         id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        variantChoice: '1l',
-        customPrice: 700,
+        variantChoice: firstVariantId,
+        customPrice: firstVariantPrice,
         qty: 1,
       },
     ]);
@@ -348,9 +361,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       prev.map((item) => {
         if (item.id === id) {
           if (field === 'variantChoice') {
-            const newChoice = value as '1l' | '500ml';
-            const autoPrice = newChoice === '1l' ? 700 : 350;
-            return { ...item, variantChoice: newChoice, customPrice: autoPrice };
+            const choiceStr = String(value);
+            let autoPrice = 700;
+            for (const p of productList) {
+              const matched = p.variants.find((v) => v.id === choiceStr);
+              if (matched) {
+                autoPrice = matched.price;
+                break;
+              }
+            }
+            if (choiceStr === '1l') autoPrice = 700;
+            if (choiceStr === '500ml') autoPrice = 350;
+            return { ...item, variantChoice: choiceStr, customPrice: autoPrice };
           }
           return { ...item, [field]: value };
         }
@@ -365,7 +387,12 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     0
   );
   const computedManualLiters = manualItems.reduce(
-    (sum, item) => sum + (item.variantChoice === '1l' ? 1 : 0.5) * (Number(item.qty) || 1),
+    (sum, item) => {
+      const is1L = item.variantChoice.includes('1l') || item.variantChoice === 'var-1l' || item.variantChoice === '1l';
+      const is500 = item.variantChoice.includes('500') || item.variantChoice === 'var-500ml' || item.variantChoice === '500ml';
+      const unitFactor = is1L ? 1 : is500 ? 0.5 : 1;
+      return sum + unitFactor * (Number(item.qty) || 1);
+    },
     0
   );
   const computedManualDiscount = Math.max(0, Number(manualDiscount) || 0);
@@ -384,37 +411,51 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       return;
     }
 
-    const prod1L = productList.find((p) => p.slug.includes('1-liter') || p.name.includes('1 Liter')) || initialProducts[0];
-    const prod500ml = productList.find((p) => p.slug.includes('500ml') || p.name.includes('500ml')) || initialProducts[1] || initialProducts[0];
-
     let subtotal = 0;
     let totalLiters = 0;
 
     const cartItems: CartItem[] = manualItems.map((item, idx) => {
-      const is1L = item.variantChoice === '1l';
-      const prod = is1L ? prod1L : prod500ml;
-      const baseVariant = prod.variants[0];
-      const customUnitPrice = Math.max(0, Number(item.customPrice) || (is1L ? 700 : 350));
+      let targetProd = productList[0];
+      let targetVariant = targetProd.variants[0];
+
+      for (const p of productList) {
+        const foundV = p.variants.find((v) => v.id === item.variantChoice);
+        if (foundV) {
+          targetProd = p;
+          targetVariant = foundV;
+          break;
+        }
+      }
+
+      if (item.variantChoice === '1l') {
+        targetProd = productList.find((p) => p.slug.includes('1-liter')) || productList[0];
+        targetVariant = targetProd.variants[0];
+      } else if (item.variantChoice === '500ml') {
+        targetProd = productList.find((p) => p.slug.includes('500ml')) || productList[1] || productList[0];
+        targetVariant = targetProd.variants[0];
+      }
+
+      const customUnitPrice = Math.max(0, Number(item.customPrice) || targetVariant.price);
       const qty = Math.max(1, Number(item.qty) || 1);
 
       subtotal += customUnitPrice * qty;
-      totalLiters += (is1L ? 1 : 0.5) * qty;
+
+      const is1L = targetVariant.size?.toLowerCase().includes('1l') || targetVariant.name.includes('1 Liter');
+      const is500 = targetVariant.size?.toLowerCase().includes('500') || targetVariant.name.includes('500');
+      totalLiters += (is1L ? 1 : is500 ? 0.5 : 1) * qty;
 
       const variant: ProductVariant = {
-        ...baseVariant,
+        ...targetVariant,
         id: `custom-var-${idx}-${Date.now()}`,
-        name: is1L ? '1 Liter Bottle' : '500ml Bottle',
-        size: is1L ? '1L' : '500ml',
         price: customUnitPrice,
-        compareAtPrice: is1L ? 750 : 450,
       };
 
       return {
-        productId: prod.id,
+        productId: targetProd.id,
         variantId: variant.id,
         quantity: qty,
-        product: prod,
-        variant: variant,
+        product: targetProd,
+        variant,
       };
     });
 
@@ -639,6 +680,116 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     saveProductList(updated);
 
     setNotificationToast(`خریداری ریٹ محفوظ ہو گیا (1L: Rs. ${cost1}, 500ml: Rs. ${cost500})`);
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
+  // Helper to read current wholesale rate for any variant in selectedMonth
+  const getVariantWholesaleRate = (variantId: string, fallbackCost: number = 0): number => {
+    const monthRate = finSettings.monthlyWholesaleRates?.[selectedMonth]?.variantRates?.[variantId];
+    if (typeof monthRate === 'number' && monthRate > 0) return monthRate;
+
+    const defaultCost = finSettings.variantCosts?.[variantId];
+    if (typeof defaultCost === 'number' && defaultCost > 0) return defaultCost;
+
+    if (variantId === 'var-1l') {
+      const m1L = finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost1L;
+      if (typeof m1L === 'number' && m1L > 0) return m1L;
+      return finSettings.defaultCostPrice1L || 480;
+    }
+    if (variantId === 'var-500ml') {
+      const m500 = finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost500ml;
+      if (typeof m500 === 'number' && m500 > 0) return m500;
+      return finSettings.defaultCostPrice500ml || 240;
+    }
+
+    return fallbackCost;
+  };
+
+  const getVariantDefaultCost = (variantId: string, fallbackCost: number = 0): number => {
+    const defaultCost = finSettings.variantCosts?.[variantId];
+    if (typeof defaultCost === 'number' && defaultCost > 0) return defaultCost;
+    if (variantId === 'var-1l') return finSettings.defaultCostPrice1L || 480;
+    if (variantId === 'var-500ml') return finSettings.defaultCostPrice500ml || 240;
+    return fallbackCost;
+  };
+
+  // Update a variant's rate for the selected month
+  const handleUpdateVariantMonthRate = (variantId: string, newRate: number) => {
+    const cost = Math.max(0, newRate);
+    const currentMonthVariants = finSettings.monthlyWholesaleRates?.[selectedMonth]?.variantRates || {};
+    const currentDefaults = finSettings.variantCosts || {};
+
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      variantCosts: {
+        ...currentDefaults,
+        [variantId]: currentDefaults[variantId] || cost,
+      },
+      monthlyWholesaleRates: {
+        ...(finSettings.monthlyWholesaleRates || {}),
+        [selectedMonth]: {
+          ...(finSettings.monthlyWholesaleRates?.[selectedMonth] || {}),
+          cost1L: variantId === 'var-1l' ? cost : (finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost1L || finSettings.defaultCostPrice1L || 480),
+          cost500ml: variantId === 'var-500ml' ? cost : (finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost500ml || finSettings.defaultCostPrice500ml || 240),
+          variantRates: {
+            ...currentMonthVariants,
+            [variantId]: cost,
+          },
+        },
+      },
+    };
+
+    if (variantId === 'var-1l') {
+      updatedSettings.defaultCostPrice1L = cost;
+      setMonthCost1L(cost.toString());
+    } else if (variantId === 'var-500ml') {
+      updatedSettings.defaultCostPrice500ml = cost;
+      setMonthCost500ml(cost.toString());
+    }
+
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+
+    // Sync productList
+    const updatedProducts = productList.map((p) => ({
+      ...p,
+      variants: p.variants.map((v) => (v.id === variantId ? { ...v, costPrice: cost } : v)),
+    }));
+    saveProductList(updatedProducts);
+
+    setNotificationToast(`خریداری ریٹ محفوظ ہو گیا: Rs. ${cost}`);
+    setTimeout(() => setNotificationToast(null), 2500);
+  };
+
+  // Update a variant's permanent default rate
+  const handleUpdateVariantDefaultCost = (variantId: string, newCost: number) => {
+    const cost = Math.max(0, newCost);
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      defaultCostPrice1L: variantId === 'var-1l' ? cost : finSettings.defaultCostPrice1L,
+      defaultCostPrice500ml: variantId === 'var-500ml' ? cost : finSettings.defaultCostPrice500ml,
+      variantCosts: {
+        ...(finSettings.variantCosts || {}),
+        [variantId]: cost,
+      },
+    };
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+
+    const updatedProducts = productList.map((p) => ({
+      ...p,
+      variants: p.variants.map((v) => (v.id === variantId ? { ...v, costPrice: cost } : v)),
+    }));
+    saveProductList(updatedProducts);
+
+    setNotificationToast(`ڈیفالٹ لاگت محفوظ ہو گئی: Rs. ${cost}`);
+    setTimeout(() => setNotificationToast(null), 2500);
+  };
+
+  const handleSaveAllWholesaleRates = () => {
+    saveFinancialSettings(finSettings);
+    saveProductList(productList);
+    setNotificationToast(`تمام پراڈکٹس کے خریداری ریٹس برائے ${selectedMonth} کامیابی سے محفوظ ہو گئے!`);
     setTimeout(() => setNotificationToast(null), 3000);
   };
 
@@ -1016,6 +1167,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
             >
               <Layers className="w-4 h-4" />
               Categories ({initialCategories.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('wholesale')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'wholesale'
+                  ? 'bg-brand-gold text-brand-charcoal font-bold'
+                  : 'text-brand-cream/80 hover:bg-white/10'
+              }`}
+            >
+              <Tag className="w-4 h-4" />
+              Wholesale Rates (خریداری ریٹس)
             </button>
 
             <button
@@ -2095,6 +2258,224 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           </div>
         )}
 
+        {/* TAB: WHOLESALE PURCHASE RATES & COGS (تمام پراڈکٹس کی خریداری لاگت) */}
+        {activeTab === 'wholesale' && (
+          <div className="space-y-8">
+            {/* Top Bar */}
+            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <div>
+                <h3 className="font-heading font-black text-xl text-brand-charcoal flex items-center gap-2">
+                  <Tag className="w-6 h-6 text-brand-green" />
+                  Wholesale Purchase Costs &amp; COGS Manager (خریداری ریٹس و لاگت)
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  سرسوں کا تیل، خالص دیسی گھی، اور آئندہ شامل کی جانے والی تمام پراڈکٹس کی خریداری لاگت یہاں سے سیٹ کریں۔ ہر مہینے کے لیے الگ ریٹ بھی درج کر سکتے ہیں۔
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                {/* Month Selector Dropdown */}
+                <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 rounded-2xl px-3.5 py-2 shadow-2xs">
+                  <Calendar className="w-4 h-4 text-brand-green flex-shrink-0" />
+                  <span className="text-xs font-bold text-stone-600">Month:</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="bg-transparent font-mono font-bold text-xs text-brand-charcoal focus:outline-none cursor-pointer"
+                  >
+                    {availableMonths.map((m) => {
+                      const [y, mon] = m.split('-');
+                      const d = new Date(Number(y), Number(mon) - 1, 1);
+                      const label = d.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' });
+                      return (
+                        <option key={m} value={m}>
+                          {label} ({m})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveAllWholesaleRates}
+                  className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-4 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                >
+                  <Check className="w-4 h-4 text-brand-gold" />
+                  تمام ریٹس محفوظ کریں (Save All)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('products');
+                    setShowAddProduct(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all shadow-2xs"
+                >
+                  <Plus className="w-4 h-4 text-brand-green" />
+                  + نئی پراڈکٹ
+                </button>
+              </div>
+            </div>
+
+            {/* Instruction Banner */}
+            <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-xl bg-amber-500 text-white text-sm">💡</span>
+                <div>
+                  <h4 className="font-heading font-black text-sm text-stone-900">
+                    منتخب مہینہ: {currentMonthReport.monthName} ({selectedMonth})
+                  </h4>
+                  <p className="text-xs text-stone-600">
+                    مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ جس مہینے مال جتنے کا پڑے، اس مہینے کے خانے میں خریداری قیمت درج کریں تاکہ اس مہینے کا منافع 100% اصل حساب کے مطابق نکلے۔
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('reports')}
+                className="inline-flex items-center gap-1.5 bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold shadow-2xs transition-all whitespace-nowrap ml-auto"
+              >
+                <BarChart3 className="w-4 h-4 text-amber-700" />
+                ماہانہ P&amp;L رپورٹ دیکھیں &rarr;
+              </button>
+            </div>
+
+            {/* List of Products & Variants */}
+            <div className="space-y-6">
+              {productList.map((prod) => (
+                <div
+                  key={prod.id}
+                  className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center font-bold text-lg text-brand-green border border-stone-200">
+                        {prod.categorySlug === 'desi-ghee' ? '🧈' : '🫒'}
+                      </div>
+                      <div>
+                        <h4 className="font-heading font-black text-base text-stone-900 flex items-center gap-2">
+                          {prod.name}
+                          <span className="text-xs font-serif text-brand-gold font-normal">
+                            ({prod.nameUrdu})
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-stone-400 font-mono">
+                          Category: {prod.category} &bull; ID: {prod.id}
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className="bg-emerald-50 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                      {prod.variants.length} پیکنگ سائز (Variants)
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
+                          <th className="py-2.5 px-3">سائز / ویرینٹ</th>
+                          <th className="py-2.5 px-3">گاہک کیلئے ریٹ (Sale Price)</th>
+                          <th className="py-2.5 px-3">
+                            اس مہینے خریداری لاگت ({selectedMonth})
+                          </th>
+                          <th className="py-2.5 px-3">ڈیفالٹ خریداری لاگت</th>
+                          <th className="py-2.5 px-3">منافع فی یونٹ (Gross Margin)</th>
+                          <th className="py-2.5 px-3 text-center">ایکشن</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {prod.variants.map((v) => {
+                          const monthCost = getVariantWholesaleRate(v.id, v.costPrice || 0);
+                          const defaultCost = getVariantDefaultCost(v.id, v.costPrice || 0);
+                          const margin = v.price - monthCost;
+                          const marginPct = v.price > 0 ? Math.round((margin / v.price) * 100) : 0;
+                          const isProfit = margin >= 0;
+
+                          return (
+                            <tr key={v.id} className="hover:bg-stone-50">
+                              <td className="py-3 px-3 font-bold text-stone-900">
+                                <div className="flex items-center gap-2">
+                                  <span>{v.name}</span>
+                                  <span className="font-mono text-[10px] text-stone-400">({v.size})</span>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 font-mono font-bold text-brand-green text-sm">
+                                {formatPrice(v.price)}
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-300 w-fit shadow-2xs">
+                                  <span className="font-bold text-xs text-amber-900">Rs.</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    defaultValue={monthCost}
+                                    key={`${v.id}-${selectedMonth}-${monthCost}`}
+                                    onBlur={(e) =>
+                                      handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
+                                    }
+                                    className="w-20 font-mono font-black text-sm text-stone-900 bg-transparent focus:outline-none"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-1.5 bg-stone-50 px-2.5 py-1.5 rounded-xl border border-stone-300 w-fit shadow-2xs">
+                                  <span className="font-bold text-xs text-stone-500">Rs.</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    defaultValue={defaultCost}
+                                    key={`${v.id}-default-${defaultCost}`}
+                                    onBlur={(e) =>
+                                      handleUpdateVariantDefaultCost(v.id, Number(e.target.value) || 0)
+                                    }
+                                    className="w-20 font-mono font-bold text-sm text-stone-700 bg-transparent focus:outline-none"
+                                    placeholder="0"
+                                  />
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`font-mono font-black text-xs px-2.5 py-1 rounded-lg border ${
+                                      isProfit
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : 'bg-red-50 text-red-800 border-red-200'
+                                    }`}
+                                  >
+                                    +{formatPrice(margin)} ({marginPct}%)
+                                  </span>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateVariantMonthRate(v.id, monthCost)}
+                                  className="bg-brand-green hover:bg-brand-green-light text-brand-cream px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
+                                >
+                                  محفوظ کریں
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* TAB 5: P&L, EXPENSES & MONTHLY REPORTS */}
         {activeTab === 'reports' && (
           <div className="space-y-8">
@@ -2196,45 +2577,65 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                     </h4>
                   </div>
                   <p className="text-xs text-stone-600 max-w-xl">
-                    مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ اس مہینے آپ کو تیل جس ریٹ پر پڑا (فی لیٹر یا 500ml)، وہ یہاں درج کریں تاکہ اس مہینے کا خالص منافع 100% درست نکلے۔
+                    مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ سرسوں کا تیل، دیسی گھی یا دیگر اشیاء جس ریٹ پر پڑیں، یہاں درج کریں۔ تمام پراڈکٹس کے مکمل ریٹس دیکھنے کیلئے ساتھ والا بٹن دبائیں۔
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-                  <div className="bg-white border border-amber-300 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-2xs">
-                    <span className="text-xs font-bold text-stone-700">1 Liter لاگت:</span>
-                    <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={monthCost1L}
-                      onChange={(e) => handleUpdate1LCost(e.target.value)}
-                      placeholder="480"
-                      className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="bg-white border border-amber-300 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-2xs">
-                    <span className="text-xs font-bold text-stone-700">500ml لاگت:</span>
-                    <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={monthCost500ml}
-                      onChange={(e) => handleUpdate500mlCost(e.target.value)}
-                      placeholder="240"
-                      className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
-                    />
-                  </div>
-
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
                   <button
                     type="button"
-                    onClick={handleSaveMonthWholesaleRates}
-                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                    onClick={() => setActiveTab('wholesale')}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
                   >
-                    محفوظ کریں (Save Rates)
+                    <Tag className="w-3.5 h-3.5" />
+                    تمام پراڈکٹس کے ریٹس کا سیکشن کھولیں &rarr;
                   </button>
                 </div>
+              </div>
+
+              {/* Dynamic Rates Grid for All Products */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-amber-200/80">
+                {productList.flatMap((p) =>
+                  p.variants.map((v) => {
+                    const monthCost = getVariantWholesaleRate(v.id, v.costPrice || 0);
+                    return (
+                      <div
+                        key={v.id}
+                        className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs flex flex-col justify-between space-y-2"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-xs text-stone-900 truncate">
+                              {p.name.includes('Mustard') ? 'سرسوں کا تیل' : p.name.includes('Ghee') ? 'دیسی گھی' : p.name}
+                            </p>
+                            <p className="text-[10px] text-stone-500 font-mono">
+                              {v.name} ({v.size}) &bull; سیل: {formatPrice(v.price)}
+                            </p>
+                          </div>
+                          <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                            {v.size}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
+                          <span className="text-[10px] font-bold text-amber-900">خریداری:</span>
+                          <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
+                          <input
+                            type="number"
+                            min={0}
+                            defaultValue={monthCost}
+                            key={`${v.id}-${selectedMonth}-${monthCost}`}
+                            onBlur={(e) =>
+                              handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
+                            }
+                            className="w-full font-mono font-black text-xs text-stone-900 bg-transparent focus:outline-none"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
@@ -2896,8 +3297,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                             }
                             className="w-full px-2.5 py-1.5 border rounded-lg bg-white text-xs font-medium"
                           >
-                            <option value="1l">1 Liter Bottle (Base: Rs. 700)</option>
-                            <option value="500ml">500ml Bottle (Base: Rs. 350)</option>
+                            {productList.flatMap((p) =>
+                              p.variants.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {p.name.includes('Mustard')
+                                    ? 'Mustard Oil'
+                                    : p.name.includes('Ghee')
+                                    ? 'Desi Ghee'
+                                    : p.name}{' '}
+                                  — {v.name} (Rs. {v.price})
+                                </option>
+                              ))
+                            )}
                           </select>
                         </div>
 
@@ -2919,7 +3330,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
                         <div className="col-span-8 sm:col-span-4">
                           <label className="text-[10px] font-bold text-stone-700 block mb-0.5">
-                            Custom Rate (PKR) — e.g. 650
+                            Custom Rate (PKR)
                           </label>
                           <div className="relative">
                             <span className="absolute left-2.5 top-1.5 text-stone-400 font-bold text-xs">Rs.</span>
@@ -2932,83 +3343,64 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               }
                               className="w-full pl-9 pr-2 py-1.5 border-2 border-emerald-500 rounded-lg font-bold text-xs text-brand-green bg-white shadow-2xs"
                               placeholder="e.g. 650"
-                              title="Enter custom price per bottle agreed on WhatsApp"
+                              title="Enter custom price agreed on WhatsApp"
                             />
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {item.variantChoice === '1l' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 650)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all ${
-                                    item.customPrice === 650
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  🔥 650 (WhatsApp)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 600)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
-                                    item.customPrice === 600
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  600
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 700)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
-                                    item.customPrice === 700
-                                      ? 'bg-stone-800 text-white border-stone-800'
-                                      : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-                                  }`}
-                                >
-                                  700
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 320)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all ${
-                                    item.customPrice === 320
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  🔥 320 (WhatsApp)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 300)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
-                                    item.customPrice === 300
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  300
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateManualItem(item.id, 'customPrice', 350)}
-                                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
-                                    item.customPrice === 350
-                                      ? 'bg-stone-800 text-white border-stone-800'
-                                      : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
-                                  }`}
-                                >
-                                  350
-                                </button>
-                              </>
-                            )}
+                            {(() => {
+                              let base = 700;
+                              for (const p of productList) {
+                                const found = p.variants.find((v) => v.id === item.variantChoice);
+                                if (found) {
+                                  base = found.price;
+                                  break;
+                                }
+                              }
+                              if (item.variantChoice === '1l') base = 700;
+                              if (item.variantChoice === '500ml') base = 350;
+                              const disc1 = Math.max(0, base - 50);
+                              const disc2 = Math.max(0, base - 100);
+
+                              return (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateManualItem(item.id, 'customPrice', disc1)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all ${
+                                      item.customPrice === disc1
+                                        ? 'bg-emerald-600 text-white border-emerald-600'
+                                        : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    🔥 {disc1} (-50)
+                                  </button>
+                                  {disc2 > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateManualItem(item.id, 'customPrice', disc2)}
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                        item.customPrice === disc2
+                                          ? 'bg-emerald-600 text-white border-emerald-600'
+                                          : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                                      }`}
+                                    >
+                                      {disc2} (-100)
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateManualItem(item.id, 'customPrice', base)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-all ${
+                                      item.customPrice === base
+                                        ? 'bg-stone-800 text-white border-stone-800'
+                                        : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+                                    }`}
+                                  >
+                                    Original ({base})
+                                  </button>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
 

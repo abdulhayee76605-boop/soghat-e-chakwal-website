@@ -9,6 +9,12 @@ import { formatPrice } from './utils';
 export const defaultFinancialSettings: FinancialSettings = {
   defaultCostPrice1L: 480,       // Wholesale / Purchase cost per 1L bottle
   defaultCostPrice500ml: 240,    // Wholesale / Purchase cost per 500ml bottle
+  variantCosts: {
+    'var-1l': 480,
+    'var-500ml': 240,
+    'var-ghee-1kg': 1800,
+    'var-ghee-500g': 950,
+  },
   monthlyWholesaleRates: {},     // Per-month wholesale purchase cost overrides
   packagingCostPerOrder: 0,      // 100% manual - zero auto calculations
   courierCostPerOrder: 0,        // 100% manual - zero auto calculations
@@ -58,6 +64,11 @@ export async function fetchServerExpenses(): Promise<{ expenses: ExpenseEntry[];
         const mergedSettings: FinancialSettings = {
           defaultCostPrice1L: localSettings.defaultCostPrice1L || data.settings?.defaultCostPrice1L || 480,
           defaultCostPrice500ml: localSettings.defaultCostPrice500ml || data.settings?.defaultCostPrice500ml || 240,
+          variantCosts: {
+            ...(defaultFinancialSettings.variantCosts || {}),
+            ...(data.settings?.variantCosts || {}),
+            ...(localSettings.variantCosts || {}),
+          },
           monthlyWholesaleRates: {
             ...(data.settings?.monthlyWholesaleRates || {}),
             ...(localSettings.monthlyWholesaleRates || {}),
@@ -216,23 +227,47 @@ export function calculateMonthlyReport(
     shippingCollected += o.shipping || 0;
 
     o.items.forEach((item) => {
+      const variantId = item.variant.id;
       const is1L =
         item.variant.size?.toLowerCase().includes('1l') ||
-        item.variant.name.includes('1') ||
+        item.variant.name.includes('1 Liter') ||
         item.product.name.includes('1 Liter');
+      const is500ml =
+        item.variant.size?.toLowerCase().includes('500ml') ||
+        item.variant.name.includes('500ml') ||
+        item.product.name.includes('500ml');
       const qty = item.quantity || 1;
 
       if (is1L) {
         bottles1LSold += qty;
         totalLiters += 1 * qty;
-      } else {
+      } else if (is500ml) {
         bottles500mlSold += qty;
         totalLiters += 0.5 * qty;
       }
 
-      // Cost price: prioritize month's wholesale rate entered by the user
-      const unitCost = is1L ? rate1L : rate500ml;
-      cogsProductCost += unitCost * qty;
+      // Dynamic COGS calculation for ALL current and future products:
+      // 1. Month-specific rate for this specific variant
+      let unitCost = settings.monthlyWholesaleRates?.[targetMonth]?.variantRates?.[variantId];
+
+      // 2. Default variant rate in settings
+      if (typeof unitCost !== 'number' || unitCost <= 0) {
+        unitCost = settings.variantCosts?.[variantId];
+      }
+
+      // 3. Variant's own costPrice in product catalog
+      if (typeof unitCost !== 'number' || unitCost <= 0) {
+        unitCost = item.variant.costPrice;
+      }
+
+      // 4. Backward compatible fallback for 1L and 500ml mustard oil
+      if (typeof unitCost !== 'number' || unitCost <= 0) {
+        if (is1L) unitCost = rate1L;
+        else if (is500ml) unitCost = rate500ml;
+        else unitCost = 0;
+      }
+
+      cogsProductCost += (Number(unitCost) || 0) * qty;
     });
   });
 

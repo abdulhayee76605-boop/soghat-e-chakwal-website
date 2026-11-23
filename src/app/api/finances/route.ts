@@ -8,6 +8,12 @@ let serverExpenses: ExpenseEntry[] = [];
 let serverSettings: FinancialSettings = {
   defaultCostPrice1L: 480,
   defaultCostPrice500ml: 240,
+  variantCosts: {
+    'var-1l': 480,
+    'var-500ml': 240,
+    'var-ghee-1kg': 1800,
+    'var-ghee-500g': 950,
+  },
   monthlyWholesaleRates: {},
   packagingCostPerOrder: 0,
   courierCostPerOrder: 0,
@@ -44,6 +50,10 @@ export async function POST(request: Request) {
       serverSettings = {
         ...serverSettings,
         ...body.settings,
+        variantCosts: {
+          ...(serverSettings.variantCosts || {}),
+          ...(body.settings.variantCosts || {}),
+        },
         monthlyWholesaleRates: {
           ...(serverSettings.monthlyWholesaleRates || {}),
           ...(body.settings.monthlyWholesaleRates || {}),

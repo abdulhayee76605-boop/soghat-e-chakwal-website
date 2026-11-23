@@ -20,8 +20,8 @@ export const categories: Category[] = [
     nameUrdu: 'دیسی گھی',
     slug: 'desi-ghee',
     description: 'Pure desi ghee made the traditional way.',
-    isActive: false,
-    productCount: 0,
+    isActive: true,
+    productCount: 1,
   },
   {
     id: 'cat-honey',
@@ -208,6 +208,87 @@ export const products: Product[] = [
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
     tags: ['mustard-oil', '500ml', 'cooking-oil', 'traditional', 'yellow-cap'],
+  },
+
+  // ── PRODUCT 3: PURE DESI GHEE (خالص دیسی گھی) ──
+  {
+    id: 'prod-desi-ghee',
+    slug: 'pure-desi-ghee',
+    name: 'Soghat-e-Chakwal Pure Desi Ghee',
+    nameUrdu: 'سوغات چکوال خالص دیسی گھی',
+    category: 'Desi Ghee',
+    categorySlug: 'desi-ghee',
+    description:
+      'Pure organic Desi Ghee crafted traditionally from fresh buffalo and cow milk butter in Chakwal. Characterized by its golden grainy texture, rich appetizing aroma, and pure nutrient-rich goodness. Free from any additives, artificial fragrance, or vegetable oils.',
+    shortDescription:
+      'Traditional pure Desi Ghee with golden grainy texture and authentic village aroma. 100% natural and unadulterated.',
+    features: [
+      '100% Pure, authentic Desi Ghee from Chakwal',
+      'Traditional Bilona & slow-cooked method',
+      'Golden, danedaar (grainy) natural texture',
+      'Rich in vitamins A, D, E, and healthy fatty acids',
+      'Perfect for parathas, halwa, desi dishes, and daily energy',
+    ],
+    ingredients: ['100% Pure Milk Butter Fat (Makhan)'],
+    storageInstructions:
+      'Store at room temperature in an airtight jar. Keep away from moisture and direct sunlight. No refrigeration required.',
+    shippingInfo:
+      'Cash on Delivery available nationwide across Pakistan. Shipped in premium leak-proof jars with protective cushioning.',
+    faqs: [
+      {
+        question: 'Is this 100% pure Desi Ghee without vegetable oil (Banaspati)?',
+        answer:
+          'Yes, absolutely 100% pure milk butter ghee without any mixing, vegetable oils, or chemicals.',
+      },
+      {
+        question: 'What packaging sizes are available?',
+        answer:
+          'Available in 1 KG (1000g) Jar and 500g Jar sizes with sealed leak-proof caps.',
+      },
+    ],
+    images: [
+      {
+        id: 'img-ghee-main',
+        src: '/images/products/desi-ghee.png',
+        alt: 'Soghat-e-Chakwal Pure Desi Ghee Jar with Official Seal',
+        width: 1200,
+        height: 800,
+        isPrimary: true,
+      },
+    ],
+    variants: [
+      {
+        id: 'var-ghee-1kg',
+        name: '1 KG Jar (۱ کلو جار)',
+        size: '1kg',
+        price: 2400,
+        compareAtPrice: 2600,
+        costPrice: 1800, // Wholesale / Purchase cost in PKR
+        sku: 'SEC-DG-1KG',
+        weight: 1000,
+        image: '/images/products/desi-ghee.png',
+        inStock: true,
+        stockQuantity: 40,
+      },
+      {
+        id: 'var-ghee-500g',
+        name: '500g Jar (۵۰۰ گرام جار)',
+        size: '500g',
+        price: 1250,
+        compareAtPrice: 1350,
+        costPrice: 950, // Wholesale / Purchase cost in PKR
+        sku: 'SEC-DG-500G',
+        weight: 500,
+        image: '/images/products/desi-ghee.png',
+        inStock: true,
+        stockQuantity: 50,
+      },
+    ],
+    isActive: true,
+    isFeatured: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    tags: ['desi-ghee', 'ghee', 'pure-ghee', 'danedaar', 'chakwal-special'],
   },
 ];
 
