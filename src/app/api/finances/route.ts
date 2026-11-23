@@ -14,6 +14,12 @@ let serverSettings: FinancialSettings = {
     'var-ghee-1kg': 1800,
     'var-ghee-500g': 950,
   },
+  variantPackaging: {
+    'var-1l': { materialCost: 60, laborCost: 5 },
+    'var-500ml': { materialCost: 40, laborCost: 5 },
+    'var-ghee-1kg': { materialCost: 70, laborCost: 10 },
+    'var-ghee-500g': { materialCost: 45, laborCost: 10 },
+  },
   monthlyWholesaleRates: {},
   packagingCostPerOrder: 0,
   courierCostPerOrder: 0,
@@ -53,6 +59,10 @@ export async function POST(request: Request) {
         variantCosts: {
           ...(serverSettings.variantCosts || {}),
           ...(body.settings.variantCosts || {}),
+        },
+        variantPackaging: {
+          ...(serverSettings.variantPackaging || {}),
+          ...(body.settings.variantPackaging || {}),
         },
         monthlyWholesaleRates: {
           ...(serverSettings.monthlyWholesaleRates || {}),

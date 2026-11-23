@@ -185,16 +185,23 @@ export interface ExpenseEntry {
   createdAt: string;
 }
 
+export interface VariantPackagingCost {
+  materialCost: number; // Bottle / Container / Carton cost per unit in PKR (e.g. 60 for 1L, 40 for 500ml)
+  laborCost: number;    // Packing / Filling labour cost per unit in PKR (e.g. 5 for 1L, 5 for 500ml)
+}
+
 export interface FinancialSettings {
   defaultCostPrice1L: number;    // Wholesale / Purchase cost per 1L bottle (e.g. 480 PKR)
   defaultCostPrice500ml: number; // Wholesale / Purchase cost per 500ml bottle (e.g. 240 PKR)
   variantCosts?: Record<string, number>; // variantId -> default wholesale purchase cost in PKR
+  variantPackaging?: Record<string, VariantPackagingCost>; // variantId -> default packaging material & labour cost
   monthlyWholesaleRates?: Record<
     string,
     {
       cost1L?: number;
       cost500ml?: number;
       variantRates?: Record<string, number>; // variantId -> wholesale purchase rate for that specific month
+      variantPackagingRates?: Record<string, VariantPackagingCost>; // variantId -> monthly packaging & labour rate
     }
   >;
   packagingCostPerOrder?: number;
@@ -216,7 +223,21 @@ export interface MonthlyFinancialReport {
   // Expense breakdown
   cogsProductCost: number;       // Wholesale product purchase cost (COGS)
   adSpend: number;               // Total advertising spend (Meta, Google, etc.)
-  packagingCost: number;         // Packaging material expenses
+  packagingCost: number;         // Total packaging material expenses (Auto sold units + manual ledger)
+  autoPackagingCost: number;     // Auto-calculated from units sold (Bottles * (material + labor))
+  autoPackagingMaterialCost: number; // Only bottle/packing materials total
+  autoPackagingLaborCost: number;    // Only packing labour total
+  manualPackagingCost: number;   // Extra manual packaging logged in ledger (cartons, tape, etc.)
+  packagingBreakdownByVariant: Array<{
+    variantId: string;
+    productName: string;
+    variantName: string;
+    unitsSold: number;
+    materialCostPerUnit: number;
+    laborCostPerUnit: number;
+    totalUnitPackaging: number;
+    totalPackagingExpense: number;
+  }>;
   courierCost: number;           // Actual courier charges paid
   operationalCost: number;       // Rent, staff, utilities
   otherExpenses: number;         // Miscellaneous

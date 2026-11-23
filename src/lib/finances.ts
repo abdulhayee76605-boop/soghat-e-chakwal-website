@@ -15,7 +15,13 @@ export const defaultFinancialSettings: FinancialSettings = {
     'var-ghee-1kg': 1800,
     'var-ghee-500g': 950,
   },
-  monthlyWholesaleRates: {},     // Per-month wholesale purchase cost overrides
+  variantPackaging: {
+    'var-1l': { materialCost: 60, laborCost: 5 },        // 60 bottle + 5 labour = 65 PKR
+    'var-500ml': { materialCost: 40, laborCost: 5 },     // 40 bottle + 5 labour = 45 PKR
+    'var-ghee-1kg': { materialCost: 70, laborCost: 10 },  // 70 jar + 10 labour = 80 PKR
+    'var-ghee-500g': { materialCost: 45, laborCost: 10 }, // 45 jar + 10 labour = 55 PKR
+  },
+  monthlyWholesaleRates: {},     // Per-month wholesale purchase cost & packaging overrides
   packagingCostPerOrder: 0,      // 100% manual - zero auto calculations
   courierCostPerOrder: 0,        // 100% manual - zero auto calculations
 };
@@ -68,6 +74,11 @@ export async function fetchServerExpenses(): Promise<{ expenses: ExpenseEntry[];
             ...(defaultFinancialSettings.variantCosts || {}),
             ...(data.settings?.variantCosts || {}),
             ...(localSettings.variantCosts || {}),
+          },
+          variantPackaging: {
+            ...(defaultFinancialSettings.variantPackaging || {}),
+            ...(data.settings?.variantPackaging || {}),
+            ...(localSettings.variantPackaging || {}),
           },
           monthlyWholesaleRates: {
             ...(data.settings?.monthlyWholesaleRates || {}),
@@ -182,6 +193,49 @@ export function clearAllExpenses(): void {
   }
 }
 
+// ── VARIANT PACKAGING & LABOUR UNIT COST HELPER ──
+export function getVariantPackagingCost(
+  settings: FinancialSettings,
+  variantId: string,
+  month?: string,
+  variantFallback?: { name?: string; size?: string }
+): { materialCost: number; laborCost: number; totalCost: number } {
+  // 1. Month specific override
+  if (month && settings.monthlyWholesaleRates?.[month]?.variantPackagingRates?.[variantId]) {
+    const rate = settings.monthlyWholesaleRates[month].variantPackagingRates[variantId];
+    const m = typeof rate.materialCost === 'number' && rate.materialCost >= 0 ? rate.materialCost : 0;
+    const l = typeof rate.laborCost === 'number' && rate.laborCost >= 0 ? rate.laborCost : 0;
+    return { materialCost: m, laborCost: l, totalCost: m + l };
+  }
+
+  // 2. Base setting for variant
+  if (settings.variantPackaging?.[variantId]) {
+    const rate = settings.variantPackaging[variantId];
+    const m = typeof rate.materialCost === 'number' && rate.materialCost >= 0 ? rate.materialCost : 0;
+    const l = typeof rate.laborCost === 'number' && rate.laborCost >= 0 ? rate.laborCost : 0;
+    return { materialCost: m, laborCost: l, totalCost: m + l };
+  }
+
+  // 3. Defaults based on packaging size & name
+  const name = (variantFallback?.name || '').toLowerCase();
+  const size = (variantFallback?.size || '').toLowerCase();
+
+  if (size.includes('1l') || name.includes('1 liter') || variantId.includes('1l')) {
+    return { materialCost: 60, laborCost: 5, totalCost: 65 };
+  }
+  if (size.includes('500') || name.includes('500ml') || variantId.includes('500')) {
+    return { materialCost: 40, laborCost: 5, totalCost: 45 };
+  }
+  if (size.includes('1kg') || name.includes('1kg') || variantId.includes('ghee-1kg')) {
+    return { materialCost: 70, laborCost: 10, totalCost: 80 };
+  }
+  if (size.includes('500g') || name.includes('500g') || variantId.includes('ghee-500g')) {
+    return { materialCost: 45, laborCost: 10, totalCost: 55 };
+  }
+
+  return { materialCost: 50, laborCost: 5, totalCost: 55 };
+}
+
 // ── FINANCIAL REPORT CALCULATOR ──
 export function calculateMonthlyReport(
   targetMonth: string, // YYYY-MM e.g. "2026-11"
@@ -220,6 +274,24 @@ export function calculateMonthlyReport(
   let discountTotal = 0;
   let shippingCollected = 0;
   let cogsProductCost = 0;
+
+  // Auto packaging & labour calculation from sold units
+  let autoPackagingMaterialCost = 0;
+  let autoPackagingLaborCost = 0;
+  let autoPackagingCost = 0;
+  const variantPackagingMap = new Map<
+    string,
+    {
+      variantId: string;
+      productName: string;
+      variantName: string;
+      unitsSold: number;
+      materialCostPerUnit: number;
+      laborCostPerUnit: number;
+      totalUnitPackaging: number;
+      totalPackagingExpense: number;
+    }
+  >();
 
   monthOrders.forEach((o) => {
     grossSales += o.subtotal || 0;
@@ -268,6 +340,33 @@ export function calculateMonthlyReport(
       }
 
       cogsProductCost += (Number(unitCost) || 0) * qty;
+
+      // ── Auto packaging calculation for this sold unit ──
+      const packInfo = getVariantPackagingCost(settings, variantId, targetMonth, item.variant);
+      const itemMat = packInfo.materialCost * qty;
+      const itemLab = packInfo.laborCost * qty;
+      const itemPackTotal = packInfo.totalCost * qty;
+
+      autoPackagingMaterialCost += itemMat;
+      autoPackagingLaborCost += itemLab;
+      autoPackagingCost += itemPackTotal;
+
+      const existingPack = variantPackagingMap.get(variantId);
+      if (existingPack) {
+        existingPack.unitsSold += qty;
+        existingPack.totalPackagingExpense += itemPackTotal;
+      } else {
+        variantPackagingMap.set(variantId, {
+          variantId,
+          productName: item.product?.name || item.variant?.name || 'Product',
+          variantName: item.variant?.name || 'Standard',
+          unitsSold: qty,
+          materialCostPerUnit: packInfo.materialCost,
+          laborCostPerUnit: packInfo.laborCost,
+          totalUnitPackaging: packInfo.totalCost,
+          totalPackagingExpense: itemPackTotal,
+        });
+      }
     });
   });
 
@@ -303,8 +402,9 @@ export function calculateMonthlyReport(
     }
   });
 
-  // 100% MANUAL entries - zero automatic multiplication or baseline assumptions
-  const totalPackagingCost = packagingExpensesLogged;
+  // Total packaging cost = Auto calculated from bottles/units sold + extra manual packaging logged
+  const manualPackagingCost = packagingExpensesLogged;
+  const totalPackagingCost = autoPackagingCost + manualPackagingCost;
   const totalCourierCost = courierExpensesLogged;
 
   const totalExpenses =
@@ -333,6 +433,11 @@ export function calculateMonthlyReport(
     cogsProductCost,
     adSpend,
     packagingCost: totalPackagingCost,
+    autoPackagingCost,
+    autoPackagingMaterialCost,
+    autoPackagingLaborCost,
+    manualPackagingCost,
+    packagingBreakdownByVariant: Array.from(variantPackagingMap.values()),
     courierCost: totalCourierCost,
     operationalCost,
     otherExpenses,

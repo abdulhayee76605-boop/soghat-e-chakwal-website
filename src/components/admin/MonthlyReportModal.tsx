@@ -400,10 +400,18 @@ export function MonthlyReportModal({ report, expenses, onClose }: MonthlyReportM
                     </tr>
                     <tr>
                       <td className="py-2.5 px-3 font-bold text-stone-900">
-                        Packaging Material (پیکنگ)
+                        Packaging Material &amp; Labour (پیکنگ میٹریل و لیبر)
                       </td>
                       <td className="py-2.5 px-3 text-stone-600">
-                        Bottles, boxes, bubble cushion wrap, tamper tape &amp; flyer pockets
+                        <span>Bottles, containers, tamper seals &amp; packing labour.</span>
+                        {report.autoPackagingCost > 0 && (
+                          <div className="text-[11px] text-amber-800 font-medium mt-0.5">
+                            🤖 Auto Units Sold: {formatPrice(report.autoPackagingCost)}
+                            {report.manualPackagingCost > 0 && (
+                              <span> + ✍️ Manual Ledger: {formatPrice(report.manualPackagingCost)}</span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-stone-900">
                         {formatPrice(report.packagingCost)}

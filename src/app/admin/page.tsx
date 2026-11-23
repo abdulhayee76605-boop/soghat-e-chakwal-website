@@ -78,6 +78,7 @@ import {
   getAvailableMonths,
   defaultFinancialSettings,
   generateMonthlyReportCSV,
+  getVariantPackagingCost,
 } from '@/lib/finances';
 import { MonthlyReportModal } from '@/components/admin/MonthlyReportModal';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
@@ -109,6 +110,7 @@ export default function AdminPage() {
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [finSettings, setFinSettings] = useState<FinancialSettings>(defaultFinancialSettings);
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [costSubTab, setCostSubTab] = useState<'wholesale' | 'packaging' | 'auto_calc'>('wholesale');
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showMonthlyStatementModal, setShowMonthlyStatementModal] = useState(false);
   const [showFinSettingsModal, setShowFinSettingsModal] = useState(false);
@@ -793,6 +795,79 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     setTimeout(() => setNotificationToast(null), 3000);
   };
 
+  // Helper to read packaging & labour costs for a variant in selectedMonth
+  const getVariantPackaging = (variantId: string, variantFallback?: { name?: string; size?: string }) => {
+    return getVariantPackagingCost(finSettings, variantId, selectedMonth, variantFallback);
+  };
+
+  // Update a variant's packaging cost for the selected month
+  const handleUpdateVariantPackagingMonth = (
+    variantId: string,
+    materialCost: number,
+    laborCost: number
+  ) => {
+    const mat = Math.max(0, materialCost);
+    const lab = Math.max(0, laborCost);
+    const currentMonthPkg = finSettings.monthlyWholesaleRates?.[selectedMonth]?.variantPackagingRates || {};
+    const currentDefaults = finSettings.variantPackaging || {};
+
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      variantPackaging: {
+        ...currentDefaults,
+        [variantId]: currentDefaults[variantId] || { materialCost: mat, laborCost: lab },
+      },
+      monthlyWholesaleRates: {
+        ...(finSettings.monthlyWholesaleRates || {}),
+        [selectedMonth]: {
+          ...(finSettings.monthlyWholesaleRates?.[selectedMonth] || {}),
+          variantPackagingRates: {
+            ...currentMonthPkg,
+            [variantId]: { materialCost: mat, laborCost: lab },
+          },
+        },
+      },
+    };
+
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+
+    setNotificationToast(
+      `پیکنگ لاگت محفوظ ہو گئی: بوتل Rs. ${mat} + لیبر Rs. ${lab} = کل Rs. ${mat + lab}`
+    );
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
+  // Update a variant's permanent default packaging cost
+  const handleUpdateVariantPackagingDefault = (
+    variantId: string,
+    materialCost: number,
+    laborCost: number
+  ) => {
+    const mat = Math.max(0, materialCost);
+    const lab = Math.max(0, laborCost);
+
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      variantPackaging: {
+        ...(finSettings.variantPackaging || {}),
+        [variantId]: { materialCost: mat, laborCost: lab },
+      },
+    };
+
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+
+    setNotificationToast(`ڈیفالٹ پیکنگ لاگت محفوظ ہو گئی: Rs. ${mat + lab}`);
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
+  const handleSaveAllPackagingRates = () => {
+    saveFinancialSettings(finSettings);
+    setNotificationToast(`تمام پراڈکٹس کے پیکنگ و لیبر ریٹس محفوظ ہو گئے!`);
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
   const handleCreateExpense = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(newExpenseAmount);
@@ -1178,7 +1253,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               }`}
             >
               <Tag className="w-4 h-4" />
-              Wholesale Rates (خریداری ریٹس)
+              Wholesale &amp; Packaging (خریداری و پیکنگ)
             </button>
 
             <button
@@ -2258,7 +2333,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           </div>
         )}
 
-        {/* TAB: WHOLESALE PURCHASE RATES & COGS (تمام پراڈکٹس کی خریداری لاگت) */}
+        {/* TAB: WHOLESALE PURCHASE RATES & COGS (تمام پراڈکٹس کی خریداری لاگت و پیکنگ میٹریل) */}
         {activeTab === 'wholesale' && (
           <div className="space-y-8">
             {/* Top Bar */}
@@ -2266,10 +2341,10 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               <div>
                 <h3 className="font-heading font-black text-xl text-brand-charcoal flex items-center gap-2">
                   <Tag className="w-6 h-6 text-brand-green" />
-                  Wholesale Purchase Costs &amp; COGS Manager (خریداری ریٹس و لاگت)
+                  Wholesale Costs &amp; Packaging Manager (خریداری ریٹس و پیکنگ لاگت)
                 </h3>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  سرسوں کا تیل، خالص دیسی گھی، اور آئندہ شامل کی جانے والی تمام پراڈکٹس کی خریداری لاگت یہاں سے سیٹ کریں۔ ہر مہینے کے لیے الگ ریٹ بھی درج کر سکتے ہیں۔
+                  سرسوں کا تیل، دیسی گھی اور آئندہ کی تمام پراڈکٹس کی خریداری قیمت، بوتل / جار میٹریل، اور لیبر کے فی یونٹ اخراجات یہاں سے مینیج کریں۔
                 </p>
               </div>
 
@@ -2296,14 +2371,25 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   </select>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveAllWholesaleRates}
-                  className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-4 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                >
-                  <Check className="w-4 h-4 text-brand-gold" />
-                  تمام ریٹس محفوظ کریں (Save All)
-                </button>
+                {costSubTab === 'wholesale' ? (
+                  <button
+                    type="button"
+                    onClick={handleSaveAllWholesaleRates}
+                    className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-4 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    <Check className="w-4 h-4 text-brand-gold" />
+                    خریداری ریٹس محفوظ کریں (Save All)
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSaveAllPackagingRates}
+                    className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    <Check className="w-4 h-4 text-brand-gold" />
+                    پیکنگ ریٹس محفوظ کریں (Save All)
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -2319,160 +2405,628 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               </div>
             </div>
 
-            {/* Instruction Banner */}
-            <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-              <div className="flex items-center gap-2.5">
-                <span className="p-2 rounded-xl bg-amber-500 text-white text-sm">💡</span>
-                <div>
-                  <h4 className="font-heading font-black text-sm text-stone-900">
-                    منتخب مہینہ: {currentMonthReport.monthName} ({selectedMonth})
-                  </h4>
-                  <p className="text-xs text-stone-600">
-                    مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ جس مہینے مال جتنے کا پڑے، اس مہینے کے خانے میں خریداری قیمت درج کریں تاکہ اس مہینے کا منافع 100% اصل حساب کے مطابق نکلے۔
-                  </p>
-                </div>
-              </div>
+            {/* Sub-Tabs: 1. Wholesale Rates | 2. Packaging & Labour | 3. Live Auto Packaging Expense */}
+            <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 pb-3">
               <button
                 type="button"
-                onClick={() => setActiveTab('reports')}
-                className="inline-flex items-center gap-1.5 bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold shadow-2xs transition-all whitespace-nowrap ml-auto"
+                onClick={() => setCostSubTab('wholesale')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  costSubTab === 'wholesale'
+                    ? 'bg-brand-green text-brand-cream shadow-sm'
+                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                }`}
               >
-                <BarChart3 className="w-4 h-4 text-amber-700" />
-                ماہانہ P&amp;L رپورٹ دیکھیں &rarr;
+                <Tag className="w-4 h-4" />
+                🏷️ Wholesale Purchase Rates (خریداری ریٹس)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCostSubTab('packaging')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  costSubTab === 'packaging'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                📦 Packaging Material &amp; Labour (پیکنگ میٹریل و لیبر لاگت)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCostSubTab('auto_calc')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  costSubTab === 'auto_calc'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                ⚡ Auto Packaging Expense ({currentMonthReport.monthName})
+                <span className="bg-white text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-black">
+                  {formatPrice(currentMonthReport.packagingCost)}
+                </span>
               </button>
             </div>
 
-            {/* List of Products & Variants */}
-            <div className="space-y-6">
-              {productList.map((prod) => (
-                <div
-                  key={prod.id}
-                  className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 space-y-4"
-                >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center font-bold text-lg text-brand-green border border-stone-200">
-                        {prod.categorySlug === 'desi-ghee' ? '🧈' : '🫒'}
+            {/* ════════════════════════════════════════════════════════════
+                SUB-TAB 1: WHOLESALE PURCHASE RATES
+            ════════════════════════════════════════════════════════════ */}
+            {costSubTab === 'wholesale' && (
+              <div className="space-y-6">
+                {/* Instruction Banner */}
+                <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-amber-500 text-white text-sm">💡</span>
+                    <div>
+                      <h4 className="font-heading font-black text-sm text-stone-900">
+                        منتخب مہینہ: {currentMonthReport.monthName} ({selectedMonth})
+                      </h4>
+                      <p className="text-xs text-stone-600">
+                        مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ جس مہینے مال جتنے کا پڑے، اس مہینے کے خانے میں خریداری قیمت درج کریں۔ پیکنگ و لیبر کا خرچہ ساتھ ملا کر کل یونٹ لاگت اور خالص منافع خود بخود نکلتا ہے۔
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCostSubTab('packaging')}
+                    className="inline-flex items-center gap-1.5 bg-white border border-amber-300 hover:bg-amber-50 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-bold shadow-2xs transition-all whitespace-nowrap ml-auto"
+                  >
+                    <Package className="w-4 h-4 text-amber-700" />
+                    پیکنگ میٹریل ریٹس دیکھیں &rarr;
+                  </button>
+                </div>
+
+                {/* List of Products & Variants */}
+                <div className="space-y-6">
+                  {productList.map((prod) => (
+                    <div
+                      key={prod.id}
+                      className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center font-bold text-lg text-brand-green border border-stone-200">
+                            {prod.categorySlug === 'desi-ghee' ? '🧈' : '🫒'}
+                          </div>
+                          <div>
+                            <h4 className="font-heading font-black text-base text-stone-900 flex items-center gap-2">
+                              {prod.name}
+                              <span className="text-xs font-serif text-brand-gold font-normal">
+                                ({prod.nameUrdu})
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-stone-400 font-mono">
+                              Category: {prod.category} &bull; ID: {prod.id}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="bg-emerald-50 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
+                          {prod.variants.length} پیکنگ سائز (Variants)
+                        </span>
                       </div>
-                      <div>
-                        <h4 className="font-heading font-black text-base text-stone-900 flex items-center gap-2">
-                          {prod.name}
-                          <span className="text-xs font-serif text-brand-gold font-normal">
-                            ({prod.nameUrdu})
-                          </span>
-                        </h4>
-                        <p className="text-[11px] text-stone-400 font-mono">
-                          Category: {prod.category} &bull; ID: {prod.id}
-                        </p>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
+                              <th className="py-2.5 px-3">سائز / ویرینٹ</th>
+                              <th className="py-2.5 px-3">گاہک ریٹ (Sale Price)</th>
+                              <th className="py-2.5 px-3">خریداری لاگت ({selectedMonth})</th>
+                              <th className="py-2.5 px-3">پیکنگ و لیبر لاگت</th>
+                              <th className="py-2.5 px-3">کل یونٹ لاگت (خریداری + پیکنگ)</th>
+                              <th className="py-2.5 px-3">حتمی منافع فی بوتل</th>
+                              <th className="py-2.5 px-3">ڈیفالٹ خریداری ریٹ</th>
+                              <th className="py-2.5 px-3 text-center">ایکشن</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100">
+                            {prod.variants.map((v) => {
+                              const monthCost = getVariantWholesaleRate(v.id, v.costPrice || 0);
+                              const defaultCost = getVariantDefaultCost(v.id, v.costPrice || 0);
+                              const packInfo = getVariantPackaging(v.id, v);
+                              const totalUnitCost = monthCost + packInfo.totalCost;
+                              const netUnitMargin = v.price - totalUnitCost;
+                              const marginPct = v.price > 0 ? Math.round((netUnitMargin / v.price) * 100) : 0;
+                              const isProfit = netUnitMargin >= 0;
+
+                              return (
+                                <tr key={v.id} className="hover:bg-stone-50">
+                                  <td className="py-3 px-3 font-bold text-stone-900">
+                                    <div className="flex items-center gap-2">
+                                      <span>{v.name}</span>
+                                      <span className="font-mono text-[10px] text-stone-400">({v.size})</span>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-3 font-mono font-bold text-brand-green text-sm">
+                                    {formatPrice(v.price)}
+                                  </td>
+
+                                  {/* Wholesale purchase cost input */}
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-300 w-fit shadow-2xs">
+                                      <span className="font-bold text-xs text-amber-900">Rs.</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        defaultValue={monthCost}
+                                        key={`${v.id}-${selectedMonth}-${monthCost}`}
+                                        id={`wholesale-${v.id}`}
+                                        onBlur={(e) =>
+                                          handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
+                                        }
+                                        className="w-20 font-mono font-black text-sm text-stone-900 bg-transparent focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  {/* Packaging & Labour cost pill */}
+                                  <td className="py-3 px-3">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCostSubTab('packaging')}
+                                      className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 px-2.5 py-1 rounded-xl text-xs font-bold border border-amber-200 transition-colors"
+                                      title="پیکنگ میٹریل و لیبر تبدیل کریں"
+                                    >
+                                      <span>📦 Rs. {packInfo.totalCost}</span>
+                                      <span className="text-[10px] text-amber-600">({packInfo.materialCost}+{packInfo.laborCost})</span>
+                                    </button>
+                                  </td>
+
+                                  {/* Total Unit Cost (Purchase + Packaging) */}
+                                  <td className="py-3 px-3 font-mono font-bold text-stone-800">
+                                    <span className="bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
+                                      Rs. {totalUnitCost}
+                                    </span>
+                                  </td>
+
+                                  {/* Net Margin per unit */}
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={`font-mono font-black text-xs px-2.5 py-1 rounded-lg border ${
+                                          isProfit
+                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                            : 'bg-red-50 text-red-800 border-red-200'
+                                        }`}
+                                      >
+                                        +{formatPrice(netUnitMargin)} ({marginPct}%)
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Default cost */}
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-1.5 bg-stone-50 px-2.5 py-1.5 rounded-xl border border-stone-300 w-fit shadow-2xs">
+                                      <span className="font-bold text-xs text-stone-500">Rs.</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        defaultValue={defaultCost}
+                                        key={`${v.id}-default-${defaultCost}`}
+                                        onBlur={(e) =>
+                                          handleUpdateVariantDefaultCost(v.id, Number(e.target.value) || 0)
+                                        }
+                                        className="w-16 font-mono font-bold text-xs text-stone-700 bg-transparent focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const el = document.getElementById(`wholesale-${v.id}`) as HTMLInputElement;
+                                        const val = Number(el?.value) || monthCost;
+                                        handleUpdateVariantMonthRate(v.id, val);
+                                      }}
+                                      className="bg-brand-green hover:bg-brand-green-light text-brand-cream px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
+                                    >
+                                      محفوظ کریں
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    <span className="bg-emerald-50 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200">
-                      {prod.variants.length} پیکنگ سائز (Variants)
-                    </span>
+            {/* ════════════════════════════════════════════════════════════
+                SUB-TAB 2: PACKAGING MATERIAL & LABOUR UNIT CONFIGURATOR
+            ════════════════════════════════════════════════════════════ */}
+            {costSubTab === 'packaging' && (
+              <div className="space-y-6">
+                {/* Visual Formula & Explanation Card */}
+                <div className="bg-gradient-to-r from-amber-500/15 via-amber-50 to-yellow-500/10 border-2 border-amber-400 rounded-3xl p-6 shadow-sm space-y-4">
+                  <div className="flex items-center gap-3">
+                    <span className="p-2.5 rounded-2xl bg-amber-600 text-white text-base">📦</span>
+                    <div>
+                      <h4 className="font-heading font-black text-base text-stone-900">
+                        پیکنگ میٹریل و لیبر لاگت کا خودکار حساب (Auto Packaging Setup)
+                      </h4>
+                      <p className="text-xs text-stone-600">
+                        یہاں ہر پروڈکٹ کے لیے بوتل / جار میٹریل کی قیمت اور فی یونٹ لیبر چارجز سیٹ کریں۔ جیسے ہی کوئی بوتل سیل ہو گی، سسٹم خود بخود اس مہینے کا کل پیکنگ خرچہ نکال لے گا۔
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
-                          <th className="py-2.5 px-3">سائز / ویرینٹ</th>
-                          <th className="py-2.5 px-3">گاہک کیلئے ریٹ (Sale Price)</th>
-                          <th className="py-2.5 px-3">
-                            اس مہینے خریداری لاگت ({selectedMonth})
-                          </th>
-                          <th className="py-2.5 px-3">ڈیفالٹ خریداری لاگت</th>
-                          <th className="py-2.5 px-3">منافع فی یونٹ (Gross Margin)</th>
-                          <th className="py-2.5 px-3 text-center">ایکشن</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-stone-100">
-                        {prod.variants.map((v) => {
-                          const monthCost = getVariantWholesaleRate(v.id, v.costPrice || 0);
-                          const defaultCost = getVariantDefaultCost(v.id, v.costPrice || 0);
-                          const margin = v.price - monthCost;
-                          const marginPct = v.price > 0 ? Math.round((margin / v.price) * 100) : 0;
-                          const isProfit = margin >= 0;
+                  {/* Formula Highlights */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+                    <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
+                      <p className="text-[11px] font-bold text-stone-500">1L سرسوں کا تیل</p>
+                      <p className="font-mono font-black text-sm text-stone-900 mt-1">
+                        Rs. 60 <span className="text-stone-400 font-normal text-xs">(بوتل)</span> + Rs. 5 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                      </p>
+                      <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
+                        = Rs. 65 فی بوتل
+                      </p>
+                    </div>
 
-                          return (
-                            <tr key={v.id} className="hover:bg-stone-50">
-                              <td className="py-3 px-3 font-bold text-stone-900">
-                                <div className="flex items-center gap-2">
-                                  <span>{v.name}</span>
-                                  <span className="font-mono text-[10px] text-stone-400">({v.size})</span>
-                                </div>
-                              </td>
+                    <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
+                      <p className="text-[11px] font-bold text-stone-500">500ml سرسوں کا تیل</p>
+                      <p className="font-mono font-black text-sm text-stone-900 mt-1">
+                        Rs. 40 <span className="text-stone-400 font-normal text-xs">(بوتل)</span> + Rs. 5 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                      </p>
+                      <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
+                        = Rs. 45 فی بوتل
+                      </p>
+                    </div>
 
-                              <td className="py-3 px-3 font-mono font-bold text-brand-green text-sm">
-                                {formatPrice(v.price)}
-                              </td>
+                    <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
+                      <p className="text-[11px] font-bold text-stone-500">1kg خالص دیسی گھی</p>
+                      <p className="font-mono font-black text-sm text-stone-900 mt-1">
+                        Rs. 70 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 10 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                      </p>
+                      <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
+                        = Rs. 80 فی جار
+                      </p>
+                    </div>
 
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-300 w-fit shadow-2xs">
-                                  <span className="font-bold text-xs text-amber-900">Rs.</span>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    defaultValue={monthCost}
-                                    key={`${v.id}-${selectedMonth}-${monthCost}`}
-                                    onBlur={(e) =>
-                                      handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
-                                    }
-                                    className="w-20 font-mono font-black text-sm text-stone-900 bg-transparent focus:outline-none"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </td>
+                    <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
+                      <p className="text-[11px] font-bold text-stone-500">500g خالص دیسی گھی</p>
+                      <p className="font-mono font-black text-sm text-stone-900 mt-1">
+                        Rs. 45 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 10 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                      </p>
+                      <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
+                        = Rs. 55 فی جار
+                      </p>
+                    </div>
+                  </div>
 
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-1.5 bg-stone-50 px-2.5 py-1.5 rounded-xl border border-stone-300 w-fit shadow-2xs">
-                                  <span className="font-bold text-xs text-stone-500">Rs.</span>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    defaultValue={defaultCost}
-                                    key={`${v.id}-default-${defaultCost}`}
-                                    onBlur={(e) =>
-                                      handleUpdateVariantDefaultCost(v.id, Number(e.target.value) || 0)
-                                    }
-                                    className="w-20 font-mono font-bold text-sm text-stone-700 bg-transparent focus:outline-none"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </td>
-
-                              <td className="py-3 px-3">
-                                <div className="flex items-center gap-1.5">
-                                  <span
-                                    className={`font-mono font-black text-xs px-2.5 py-1 rounded-lg border ${
-                                      isProfit
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                        : 'bg-red-50 text-red-800 border-red-200'
-                                    }`}
-                                  >
-                                    +{formatPrice(margin)} ({marginPct}%)
-                                  </span>
-                                </div>
-                              </td>
-
-                              <td className="py-3 px-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateVariantMonthRate(v.id, monthCost)}
-                                  className="bg-brand-green hover:bg-brand-green-light text-brand-cream px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
-                                >
-                                  محفوظ کریں
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-1 border-t border-amber-200/60 text-xs text-stone-600">
+                    <span>
+                      ✨ <strong>نئی پراڈکٹس:</strong> آئندہ جو بھی پروڈکٹ یا ویرینٹ آپ ایڈ کریں گے وہ خود بخود نیچے لسٹ میں آ جائے گی اور آپ اس کے ریٹس سیٹ کر سکیں گے۔
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCostSubTab('auto_calc')}
+                      className="text-amber-900 font-bold hover:underline whitespace-nowrap"
+                    >
+                      اس مہینے کا لائیو آٹو خرچہ دیکھیں &rarr;
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Packaging Form for each Product */}
+                <div className="space-y-6">
+                  {productList.map((prod) => (
+                    <div
+                      key={prod.id}
+                      className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center font-bold text-lg text-amber-800 border border-amber-200">
+                            📦
+                          </div>
+                          <div>
+                            <h4 className="font-heading font-black text-base text-stone-900 flex items-center gap-2">
+                              {prod.name}
+                              <span className="text-xs font-serif text-brand-gold font-normal">
+                                ({prod.nameUrdu})
+                              </span>
+                            </h4>
+                            <p className="text-[11px] text-stone-400 font-mono">
+                              Packaging Specification &bull; Category: {prod.category}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1 rounded-full border border-amber-200">
+                          {prod.variants.length} پیکنگ ویرینٹس
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
+                              <th className="py-2.5 px-3">سائز / ویرینٹ</th>
+                              <th className="py-2.5 px-3">گاہک کیلئے ریٹ</th>
+                              <th className="py-2.5 px-3">بوتل / کنٹینر میٹریل لاگت ({selectedMonth})</th>
+                              <th className="py-2.5 px-3">لیبر خرچ ({selectedMonth})</th>
+                              <th className="py-2.5 px-3">کل پیکنگ فی یونٹ</th>
+                              <th className="py-2.5 px-3">ڈیفالٹ بیس لاگت</th>
+                              <th className="py-2.5 px-3 text-center">ایکشن</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100">
+                            {prod.variants.map((v) => {
+                              const packInfo = getVariantPackaging(v.id, v);
+                              const defaultPack = finSettings.variantPackaging?.[v.id] || {
+                                materialCost: packInfo.materialCost,
+                                laborCost: packInfo.laborCost,
+                              };
+
+                              return (
+                                <tr key={v.id} className="hover:bg-stone-50">
+                                  <td className="py-3 px-3 font-bold text-stone-900">
+                                    <div className="flex items-center gap-2">
+                                      <span>{v.name}</span>
+                                      <span className="font-mono text-[10px] text-stone-400">({v.size})</span>
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-3 font-mono font-bold text-stone-700">
+                                    {formatPrice(v.price)}
+                                  </td>
+
+                                  {/* Bottle / Material Cost Input */}
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-300 w-fit shadow-2xs">
+                                      <span className="font-bold text-xs text-amber-900">Rs.</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        defaultValue={packInfo.materialCost}
+                                        key={`${v.id}-${selectedMonth}-mat-${packInfo.materialCost}`}
+                                        id={`mat-${v.id}`}
+                                        className="w-16 font-mono font-black text-sm text-stone-900 bg-transparent focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  {/* Labour Cost Input */}
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-1.5 bg-blue-50 px-2.5 py-1.5 rounded-xl border border-blue-300 w-fit shadow-2xs">
+                                      <span className="font-bold text-xs text-blue-900">Rs.</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        defaultValue={packInfo.laborCost}
+                                        key={`${v.id}-${selectedMonth}-lab-${packInfo.laborCost}`}
+                                        id={`lab-${v.id}`}
+                                        className="w-14 font-mono font-black text-sm text-stone-900 bg-transparent focus:outline-none"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </td>
+
+                                  {/* Total Unit Packaging (Material + Labour) */}
+                                  <td className="py-3 px-3">
+                                    <span className="font-mono font-black text-xs px-2.5 py-1 rounded-lg border bg-amber-100 text-amber-900 border-amber-300">
+                                      Rs. {packInfo.totalCost}
+                                      <span className="text-[10px] font-normal text-amber-700 ml-1">
+                                        ({packInfo.materialCost} + {packInfo.laborCost})
+                                      </span>
+                                    </span>
+                                  </td>
+
+                                  {/* Default Base */}
+                                  <td className="py-3 px-3 font-mono text-xs text-stone-500">
+                                    Rs. {(defaultPack.materialCost || 0) + (defaultPack.laborCost || 0)}
+                                    <span className="text-[10px] text-stone-400 block">
+                                      (بوتل {defaultPack.materialCost || 0} + لیبر {defaultPack.laborCost || 0})
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const matEl = document.getElementById(`mat-${v.id}`) as HTMLInputElement;
+                                        const labEl = document.getElementById(`lab-${v.id}`) as HTMLInputElement;
+                                        const mat = Number(matEl?.value) || 0;
+                                        const lab = Number(labEl?.value) || 0;
+                                        handleUpdateVariantPackagingMonth(v.id, mat, lab);
+                                      }}
+                                      className="bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95"
+                                    >
+                                      محفوظ کریں
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ════════════════════════════════════════════════════════════
+                SUB-TAB 3: AUTO-CALCULATED PACKAGING EXPENSE & SUMMARY
+            ════════════════════════════════════════════════════════════ */}
+            {costSubTab === 'auto_calc' && (
+              <div className="space-y-6">
+                {/* Monthly KPI Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      فروخت شدہ بوتلیں / یونٹس ({currentMonthReport.monthName})
+                    </p>
+                    <p className="font-heading text-2xl font-black text-brand-charcoal font-mono">
+                      {currentMonthReport.bottles1LSold + currentMonthReport.bottles500mlSold}
+                      <span className="text-xs text-stone-500 font-normal ml-1.5">
+                        ({currentMonthReport.bottles1LSold}x 1L, {currentMonthReport.bottles500mlSold}x 500ml)
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                      🤖 آٹو بوتل / میٹریل خرچ (Materials)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-amber-900 font-mono">
+                      {formatPrice(currentMonthReport.autoPackagingMaterialCost)}
+                    </p>
+                    <p className="text-[10px] text-stone-500">
+                      فروخت شدہ بوتلوں کی بنیاد پر خودکار لاگت
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                      🤖 آٹو لیبر و پیکنگ خرچ (Labor)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-blue-900 font-mono">
+                      {formatPrice(currentMonthReport.autoPackagingLaborCost)}
+                    </p>
+                    <p className="text-[10px] text-stone-500">
+                      فی بوتل لیبر چارجز کے مطابق
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-3xl p-5 text-white shadow-sm space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-100">
+                      کل پیکنگ خرچ (Total Packaging in P&amp;L)
+                    </p>
+                    <p className="font-heading text-2xl font-black font-mono">
+                      {formatPrice(currentMonthReport.packagingCost)}
+                    </p>
+                    <p className="text-[10px] text-amber-100">
+                      آٹو یونٹس ({formatPrice(currentMonthReport.autoPackagingCost)}) + مینوئل لیجر ({formatPrice(currentMonthReport.manualPackagingCost)})
+                    </p>
+                  </div>
+                </div>
+
+                {/* Itemized Table of Sold Units for this Month */}
+                <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-stone-100 pb-3">
+                    <div>
+                      <h4 className="font-heading font-black text-base text-stone-900 flex items-center gap-2">
+                        <span>📋</span> اس مہینے کا خودکار پیکنگ بریک ڈاؤن ({currentMonthReport.monthName})
+                      </h4>
+                      <p className="text-xs text-stone-500">
+                        ہر پروڈکٹ کی فروخت اور اس پر لگنے والے میٹریل و لیبر کا اصل شفاف حساب۔
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('reports')}
+                      className="inline-flex items-center gap-1.5 bg-brand-green text-brand-cream px-3.5 py-1.5 rounded-xl text-xs font-bold hover:bg-brand-green-light transition-all"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5 text-brand-gold" />
+                      ماہانہ P&amp;L رپورٹ دیکھیں &rarr;
+                    </button>
+                  </div>
+
+                  {currentMonthReport.packagingBreakdownByVariant.length === 0 ? (
+                    <div className="py-8 text-center space-y-2 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
+                      <p className="text-sm font-bold text-stone-700">
+                        اس مہینے ({currentMonthReport.monthName}) میں ابھی تک کوئی آرڈر موصول نہیں ہوا۔
+                      </p>
+                      <p className="text-xs text-stone-500 max-w-md mx-auto">
+                        جیسے ہی کسٹمر آرڈر کرے گا، اس کی فروخت شدہ بوتلوں کے مطابق 1L پر 65 روپے اور 500ml پر 45 روپے (اور دیگر پروڈکٹس کے سیٹ کردہ ریٹس) کے مطابق پیکنگ خرچ خود بخود یہاں کیلکولیٹ ہو جائے گا۔
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
+                            <th className="py-2.5 px-3">پراڈکٹ / سائز</th>
+                            <th className="py-2.5 px-3 text-center">فروخت شدہ بوتلیں (Units Sold)</th>
+                            <th className="py-2.5 px-3 text-center">بوتل میٹریل لاگت</th>
+                            <th className="py-2.5 px-3 text-center">لیبر چارج فی یونٹ</th>
+                            <th className="py-2.5 px-3 text-center">کل لاگت فی بوتل</th>
+                            <th className="py-2.5 px-3 text-right">کل ماہانہ پیکنگ خرچ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                          {currentMonthReport.packagingBreakdownByVariant.map((item) => (
+                            <tr key={item.variantId} className="hover:bg-stone-50">
+                              <td className="py-3 px-3 font-bold text-stone-900">
+                                <div>
+                                  <p>{item.productName}</p>
+                                  <p className="font-mono text-[10px] text-stone-400">{item.variantName}</p>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-black text-brand-green text-sm">
+                                {item.unitsSold}
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono text-stone-600">
+                                Rs. {item.materialCostPerUnit}
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono text-stone-600">
+                                Rs. {item.laborCostPerUnit}
+                              </td>
+
+                              <td className="py-3 px-3 text-center font-mono font-bold text-amber-900">
+                                <span className="bg-amber-100 px-2 py-0.5 rounded-lg">
+                                  Rs. {item.totalUnitPackaging}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3 text-right font-mono font-black text-red-600 text-sm">
+                                {formatPrice(item.totalPackagingExpense)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-stone-100 font-bold border-t-2 border-stone-300">
+                            <td colSpan={5} className="py-3 px-3 text-stone-800">
+                              🤖 کل آٹو پیکنگ و لیبر خرچ (Auto Packaging Subtotal)
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-black text-red-600 text-sm">
+                              {formatPrice(currentMonthReport.autoPackagingCost)}
+                            </td>
+                          </tr>
+                          {currentMonthReport.manualPackagingCost > 0 && (
+                            <tr className="bg-stone-50 text-stone-600">
+                              <td colSpan={5} className="py-2 px-3">
+                                ✍️ اضافی مینوئل اخراجات (کارٹن، فائر پاکٹ، ٹیپ جو لیجر میں درج کیے گئے)
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold">
+                                {formatPrice(currentMonthReport.manualPackagingCost)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr className="bg-amber-100/70 font-black text-amber-950 border-t border-amber-300">
+                            <td colSpan={5} className="py-3 px-3 text-sm">
+                              کل پیکنگ میٹریل لاگت برائے ماہ (Total Packaging Expense in P&amp;L)
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-base font-black text-amber-900">
+                              {formatPrice(currentMonthReport.packagingCost)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2617,20 +3171,28 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
-                          <span className="text-[10px] font-bold text-amber-900">خریداری:</span>
-                          <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
-                          <input
-                            type="number"
-                            min={0}
-                            defaultValue={monthCost}
-                            key={`${v.id}-${selectedMonth}-${monthCost}`}
-                            onBlur={(e) =>
-                              handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
-                            }
-                            className="w-full font-mono font-black text-xs text-stone-900 bg-transparent focus:outline-none"
-                            placeholder="0"
-                          />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
+                            <span className="text-[10px] font-bold text-amber-900">خریداری:</span>
+                            <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
+                            <input
+                              type="number"
+                              min={0}
+                              defaultValue={monthCost}
+                              key={`${v.id}-${selectedMonth}-${monthCost}`}
+                              onBlur={(e) =>
+                                handleUpdateVariantMonthRate(v.id, Number(e.target.value) || 0)
+                              }
+                              className="w-full font-mono font-black text-xs text-stone-900 bg-transparent focus:outline-none"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] px-1 text-stone-500 font-mono">
+                            <span>پیکنگ: Rs. {getVariantPackaging(v.id, v).totalCost}</span>
+                            <span className="font-bold text-emerald-800">
+                              خالص: +{formatPrice(v.price - (monthCost + getVariantPackaging(v.id, v).totalCost))}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -2783,7 +3345,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
-                      Packaging Materials (پیکنگ)
+                      Packaging &amp; Labour Materials (پیکنگ و لیبر)
                     </p>
                     <p className="font-heading text-2xl font-black text-stone-900 mt-1">
                       {formatPrice(currentMonthReport.packagingCost)}
@@ -2791,20 +3353,47 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   </div>
                   <span className="p-2 rounded-xl bg-amber-50 text-amber-700 text-xs">📦</span>
                 </div>
-                <p className="text-[11px] text-stone-500">
-                  Carton boxes, bubble wrap, tape &amp; flyer pockets
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewExpenseCategory('packaging');
-                    setNewExpenseTitle('Packaging Cartons & Bubble Wrap');
-                    setShowAddExpenseModal(true);
-                  }}
-                  className="w-full text-center py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-bold text-xs transition-colors"
-                >
-                  + Add Packaging Cost
-                </button>
+                <div className="space-y-1 text-[11px] text-stone-600 border-t border-stone-100 pt-2">
+                  <div className="flex justify-between">
+                    <span className="flex items-center gap-1">
+                      <span>🤖</span> فروخت شدہ یونٹس (Auto):
+                    </span>
+                    <span className="font-mono font-bold text-amber-900">
+                      {formatPrice(currentMonthReport.autoPackagingCost)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-stone-500">
+                    <span className="flex items-center gap-1">
+                      <span>✍️</span> مینوئل اخراجات (Manual Ledger):
+                    </span>
+                    <span className="font-mono">
+                      {formatPrice(currentMonthReport.manualPackagingCost)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('wholesale');
+                      setCostSubTab('packaging');
+                    }}
+                    className="flex-1 text-center py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-bold text-xs transition-colors"
+                  >
+                    ⚙️ پیکنگ ریٹس
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewExpenseCategory('packaging');
+                      setNewExpenseTitle('Packaging Cartons & Tape');
+                      setShowAddExpenseModal(true);
+                    }}
+                    className="flex-1 text-center py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl font-bold text-xs transition-colors"
+                  >
+                    + مینوئل خرچ
+                  </button>
+                </div>
               </div>
 
               {/* Category 3: Courier Delivery */}
