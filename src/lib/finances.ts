@@ -12,14 +12,14 @@ export const defaultFinancialSettings: FinancialSettings = {
   variantCosts: {
     'var-1l': 480,
     'var-500ml': 240,
-    'var-ghee-1kg': 1800,
-    'var-ghee-500g': 950,
+    'var-ghee-1kg': 3000,        // Purchasing price for 1kg Desi Ghee
+    'var-ghee-500g': 1550,       // Purchasing price for 500g Desi Ghee
   },
   variantPackaging: {
     'var-1l': { materialCost: 60, laborCost: 5 },        // 60 bottle + 5 labour = 65 PKR
     'var-500ml': { materialCost: 40, laborCost: 5 },     // 40 bottle + 5 labour = 45 PKR
-    'var-ghee-1kg': { materialCost: 70, laborCost: 10 },  // 70 jar + 10 labour = 80 PKR
-    'var-ghee-500g': { materialCost: 45, laborCost: 10 }, // 45 jar + 10 labour = 55 PKR
+    'var-ghee-1kg': { materialCost: 65, laborCost: 5 },  // 65 jar + 5 labelling/labour = 70 PKR
+    'var-ghee-500g': { materialCost: 35, laborCost: 5 }, // 35 jar + 5 labelling/labour = 40 PKR
   },
   monthlyWholesaleRates: {},     // Per-month wholesale purchase cost & packaging overrides
   packagingCostPerOrder: 0,      // 100% manual - zero auto calculations
@@ -227,10 +227,10 @@ export function getVariantPackagingCost(
     return { materialCost: 40, laborCost: 5, totalCost: 45 };
   }
   if (size.includes('1kg') || name.includes('1kg') || variantId.includes('ghee-1kg')) {
-    return { materialCost: 70, laborCost: 10, totalCost: 80 };
+    return { materialCost: 65, laborCost: 5, totalCost: 70 };
   }
   if (size.includes('500g') || name.includes('500g') || variantId.includes('ghee-500g')) {
-    return { materialCost: 45, laborCost: 10, totalCost: 55 };
+    return { materialCost: 35, laborCost: 5, totalCost: 40 };
   }
 
   return { materialCost: 50, laborCost: 5, totalCost: 55 };
@@ -249,6 +249,13 @@ export function calculateMonthlyReport(
     return o.createdAt.startsWith(targetMonth);
   });
 
+  // STRICT ACCOUNTING RULE: Only DELIVERED orders generate realized revenue, COGS, and profit!
+  // Pending, confirmed, packed, shipped, cancelled or returned orders do NOT count towards profit.
+  const deliveredOrders = monthOrders.filter((o) => o.status === 'delivered');
+  const cancelledOrReturnedOrders = monthOrders.filter(
+    (o) => o.status === 'cancelled' || o.status === 'returned'
+  );
+
   // Filter expenses for the target month (ignoring any legacy demo entries)
   const monthExpenses = expenses.filter((e) => {
     if (e.id && e.id.startsWith('exp-demo')) return false;
@@ -266,7 +273,7 @@ export function calculateMonthlyReport(
       ? monthWholesale.cost500ml
       : (settings.defaultCostPrice500ml || 240);
 
-  // Calculate order items & COGS
+  // Calculate order items & COGS strictly from DELIVERED orders
   let bottles1LSold = 0;
   let bottles500mlSold = 0;
   let totalLiters = 0;
@@ -293,7 +300,7 @@ export function calculateMonthlyReport(
     }
   >();
 
-  monthOrders.forEach((o) => {
+  deliveredOrders.forEach((o) => {
     grossSales += o.subtotal || 0;
     discountTotal += o.discount || 0;
     shippingCollected += o.shipping || 0;
@@ -422,7 +429,10 @@ export function calculateMonthlyReport(
   return {
     month: targetMonth,
     monthName,
-    ordersCount: monthOrders.length,
+    ordersCount: deliveredOrders.length,
+    deliveredOrdersCount: deliveredOrders.length,
+    totalOrdersBooked: monthOrders.length,
+    cancelledOrdersCount: cancelledOrReturnedOrders.length,
     totalLiters,
     bottles1LSold,
     bottles500mlSold,

@@ -258,7 +258,7 @@ export function MonthlyReportModal({ report, expenses, onClose }: MonthlyReportM
                         Gross Product Sales (Items Subtotal)
                       </td>
                       <td className="py-2.5 px-3 text-center text-stone-600 font-mono">
-                        {report.ordersCount} Orders ({report.bottles1LSold} x 1L, {report.bottles500mlSold} x 500ml)
+                        {report.ordersCount} Delivered Orders ({report.bottles1LSold} x 1L, {report.bottles500mlSold} x 500ml)
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-stone-900">
                         {formatPrice(report.grossSales)}

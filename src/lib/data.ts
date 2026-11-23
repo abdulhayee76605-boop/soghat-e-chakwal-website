@@ -249,24 +249,24 @@ export const products: Product[] = [
     images: [
       {
         id: 'img-ghee-main',
-        src: '/images/products/desi-ghee.png',
-        alt: 'Soghat-e-Chakwal Pure Desi Ghee Jar with Official Seal',
+        src: '/images/products/desi-ghee.jpg',
+        alt: 'Soghat-e-Chakwal Pure Desi Ghee 1 Litre Jar',
         width: 1200,
-        height: 800,
+        height: 1200,
         isPrimary: true,
       },
     ],
     variants: [
       {
         id: 'var-ghee-1kg',
-        name: '1 KG Jar (۱ کلو جار)',
+        name: '1 Liter / 1 KG Jar (۱ لیٹر / ۱ کلو جار)',
         size: '1kg',
-        price: 2400,
-        compareAtPrice: 2600,
-        costPrice: 1800, // Wholesale / Purchase cost in PKR
+        price: 3999, // Sale Price in PKR
+        compareAtPrice: 4500, // Original / Normal price in PKR
+        costPrice: 3000, // Wholesale / Purchase cost in PKR
         sku: 'SEC-DG-1KG',
         weight: 1000,
-        image: '/images/products/desi-ghee.png',
+        image: '/images/products/desi-ghee.jpg',
         inStock: true,
         stockQuantity: 40,
       },
@@ -274,12 +274,12 @@ export const products: Product[] = [
         id: 'var-ghee-500g',
         name: '500g Jar (۵۰۰ گرام جار)',
         size: '500g',
-        price: 1250,
-        compareAtPrice: 1350,
-        costPrice: 950, // Wholesale / Purchase cost in PKR
+        price: 2099,
+        compareAtPrice: 2350,
+        costPrice: 1550, // Wholesale / Purchase cost in PKR
         sku: 'SEC-DG-500G',
         weight: 500,
-        image: '/images/products/desi-ghee.png',
+        image: '/images/products/desi-ghee.jpg',
         inStock: true,
         stockQuantity: 50,
       },

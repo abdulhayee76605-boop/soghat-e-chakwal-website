@@ -99,7 +99,8 @@ export type OrderStatus =
   | 'packed'
   | 'shipped'
   | 'delivered'
-  | 'cancelled';
+  | 'cancelled'
+  | 'returned';
 
 export type PaymentStatus = 'pending' | 'received' | 'refunded';
 
@@ -211,7 +212,10 @@ export interface FinancialSettings {
 export interface MonthlyFinancialReport {
   month: string;                 // YYYY-MM e.g. "2026-11"
   monthName: string;             // e.g. "November 2026"
-  ordersCount: number;
+  ordersCount: number;           // Only DELIVERED orders that generated actual profit
+  deliveredOrdersCount?: number; // Only DELIVERED orders count
+  totalOrdersBooked?: number;    // Total all orders placed in month (including pending/shipped/cancelled)
+  cancelledOrdersCount?: number; // Orders cancelled or returned (excluded from profit)
   totalLiters: number;
   bottles1LSold: number;
   bottles500mlSold: number;

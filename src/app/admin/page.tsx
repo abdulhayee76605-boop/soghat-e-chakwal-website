@@ -275,7 +275,50 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
             const parsed = JSON.parse(storedProds) as Product[];
             const existingIds = new Set(parsed.map((p) => p.id));
             const missingSeed = initialProducts.filter((p) => !existingIds.has(p.id));
-            const merged = [...parsed, ...missingSeed];
+            let merged = [...parsed, ...missingSeed];
+
+            // Ensure Desi Ghee has the latest official price (sale 3999 / original 4500), purchase cost (3000), and image
+            merged = merged.map((p) => {
+              if (p.id === 'prod-desi-ghee') {
+                return {
+                  ...p,
+                  images: [
+                    {
+                      id: 'img-ghee-main',
+                      src: '/images/products/desi-ghee.jpg',
+                      alt: 'Soghat-e-Chakwal Pure Desi Ghee 1 Litre Jar',
+                      width: 1200,
+                      height: 1200,
+                      isPrimary: true,
+                    },
+                  ],
+                  variants: p.variants.map((v) => {
+                    if (v.id === 'var-ghee-1kg') {
+                      return {
+                        ...v,
+                        name: '1 Liter / 1 KG Jar (۱ لیٹر / ۱ کلو جار)',
+                        price: 3999,
+                        compareAtPrice: 4500,
+                        costPrice: 3000,
+                        image: '/images/products/desi-ghee.jpg',
+                      };
+                    }
+                    if (v.id === 'var-ghee-500g') {
+                      return {
+                        ...v,
+                        price: 2099,
+                        compareAtPrice: 2350,
+                        costPrice: 1550,
+                        image: '/images/products/desi-ghee.jpg',
+                      };
+                    }
+                    return v;
+                  }),
+                };
+              }
+              return p;
+            });
+
             setProductList(merged);
             localStorage.setItem('sec_products', JSON.stringify(merged));
           } catch {
@@ -552,20 +595,33 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     try {
       const data = await fetchServerExpenses();
       setExpenses(data.expenses);
-      setFinSettings(data.settings);
-      const rate = data.settings.monthlyWholesaleRates?.[selectedMonth];
+      const settings = data.settings;
+      if (!settings.variantCosts?.['var-ghee-1kg'] || settings.variantCosts?.['var-ghee-1kg'] === 1800) {
+        settings.variantCosts = { ...(settings.variantCosts || {}), 'var-ghee-1kg': 3000 };
+      }
+      if (!settings.variantPackaging?.['var-ghee-1kg'] || settings.variantPackaging?.['var-ghee-1kg']?.materialCost === 70) {
+        settings.variantPackaging = { ...(settings.variantPackaging || {}), 'var-ghee-1kg': { materialCost: 65, laborCost: 5 } };
+      }
+      setFinSettings(settings);
+      const rate = settings.monthlyWholesaleRates?.[selectedMonth];
       setMonthCost1L(
         rate && typeof rate.cost1L === 'number' && rate.cost1L > 0
           ? rate.cost1L.toString()
-          : (data.settings.defaultCostPrice1L || 480).toString()
+          : (settings.defaultCostPrice1L || 480).toString()
       );
       setMonthCost500ml(
         rate && typeof rate.cost500ml === 'number' && rate.cost500ml > 0
           ? rate.cost500ml.toString()
-          : (data.settings.defaultCostPrice500ml || 240).toString()
+          : (settings.defaultCostPrice500ml || 240).toString()
       );
     } catch {
       const stored = getStoredFinancialSettings();
+      if (!stored.variantCosts?.['var-ghee-1kg'] || stored.variantCosts?.['var-ghee-1kg'] === 1800) {
+        stored.variantCosts = { ...(stored.variantCosts || {}), 'var-ghee-1kg': 3000 };
+      }
+      if (!stored.variantPackaging?.['var-ghee-1kg'] || stored.variantPackaging?.['var-ghee-1kg']?.materialCost === 70) {
+        stored.variantPackaging = { ...(stored.variantPackaging || {}), 'var-ghee-1kg': { materialCost: 65, laborCost: 5 } };
+      }
       setExpenses(getStoredExpenses());
       setFinSettings(stored);
       const rate = stored.monthlyWholesaleRates?.[selectedMonth];
@@ -703,6 +759,11 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       if (typeof m500 === 'number' && m500 > 0) return m500;
       return finSettings.defaultCostPrice500ml || 240;
     }
+    if (variantId === 'var-ghee-1kg') {
+      const mGhee = finSettings.monthlyWholesaleRates?.[selectedMonth]?.variantRates?.['var-ghee-1kg'];
+      if (typeof mGhee === 'number' && mGhee > 0) return mGhee;
+      return finSettings.variantCosts?.['var-ghee-1kg'] || 3000;
+    }
 
     return fallbackCost;
   };
@@ -712,6 +773,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     if (typeof defaultCost === 'number' && defaultCost > 0) return defaultCost;
     if (variantId === 'var-1l') return finSettings.defaultCostPrice1L || 480;
     if (variantId === 'var-500ml') return finSettings.defaultCostPrice500ml || 240;
+    if (variantId === 'var-ghee-1kg') return finSettings.variantCosts?.['var-ghee-1kg'] || 3000;
     return fallbackCost;
   };
 
@@ -1094,13 +1156,16 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     saveProductList(productList.filter((p) => p.id !== id));
   };
 
-  // Analytics & Financial Computations
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.paymentStatus === 'received' ? o.total : 0), 0);
-  const totalSalesAllTime = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+  // Analytics & Financial Computations — ONLY DELIVERED orders count towards realized sales & profit!
+  // Pending, packed, shipped, cancelled, or returned orders are NOT counted in realized profit.
+  const deliveredOrdersAllTime = orders.filter((o) => o.status === 'delivered');
+  const totalRevenue = deliveredOrdersAllTime.reduce((sum, o) => sum + (o.total || 0), 0);
+  const totalSalesAllTime = deliveredOrdersAllTime.reduce((sum, o) => sum + (o.total || 0), 0);
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
+  const cancelledOrdersCount = orders.filter((o) => o.status === 'cancelled' || o.status === 'returned').length;
 
   const allTimeExpensesLogged = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const allTimeCogs = orders.reduce((sum, o) => {
+  const allTimeCogs = deliveredOrdersAllTime.reduce((sum, o) => {
     return (
       sum +
       o.items.reduce((iSum, item) => {
@@ -1184,10 +1249,10 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-stone-100 flex flex-col md:flex-row pt-14 md:pt-16">
       {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-brand-green text-brand-cream p-6 flex flex-col justify-between flex-shrink-0">
-        <div className="space-y-8">
+      <aside className="w-full md:w-64 bg-brand-green text-brand-cream p-5 md:p-6 flex flex-col justify-between flex-shrink-0 md:sticky md:top-16 md:h-[calc(100vh-4rem)] md:overflow-y-auto">
+        <div className="space-y-6 md:space-y-8">
           <div>
             <h2 className="font-heading text-xl font-bold text-brand-gold">
               Soghat-e-Chakwal
@@ -1861,7 +1926,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               className={`text-xs font-bold rounded-lg px-2.5 py-1 border transition-colors ${
                                 order.status === 'delivered'
                                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                  : order.status === 'cancelled'
+                                  : order.status === 'cancelled' || order.status === 'returned'
                                   ? 'bg-red-50 text-red-800 border-red-200'
                                   : 'bg-amber-50 text-amber-800 border-amber-200'
                               }`}
@@ -1870,8 +1935,9 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               <option value="confirmed">Confirmed</option>
                               <option value="packed">Packed</option>
                               <option value="shipped">Shipped</option>
-                              <option value="delivered">Delivered</option>
-                              <option value="cancelled">Cancelled</option>
+                              <option value="delivered">Delivered (ڈیلیورڈ - منافع)</option>
+                              <option value="cancelled">Cancelled (منسوخ)</option>
+                              <option value="returned">Returned (واپس)</option>
                             </select>
                           </td>
 
@@ -2686,20 +2752,20 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                     <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
                       <p className="text-[11px] font-bold text-stone-500">1kg خالص دیسی گھی</p>
                       <p className="font-mono font-black text-sm text-stone-900 mt-1">
-                        Rs. 70 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 10 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                        Rs. 65 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 5 <span className="text-stone-400 font-normal text-xs">(لیبر/لیبل)</span>
                       </p>
                       <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
-                        = Rs. 80 فی جار
+                        = Rs. 70 فی جار
                       </p>
                     </div>
 
                     <div className="bg-white/90 border border-amber-300 rounded-2xl p-3 shadow-2xs">
                       <p className="text-[11px] font-bold text-stone-500">500g خالص دیسی گھی</p>
                       <p className="font-mono font-black text-sm text-stone-900 mt-1">
-                        Rs. 45 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 10 <span className="text-stone-400 font-normal text-xs">(لیبر)</span>
+                        Rs. 35 <span className="text-stone-400 font-normal text-xs">(جار)</span> + Rs. 5 <span className="text-stone-400 font-normal text-xs">(لیبر/لیبل)</span>
                       </p>
                       <p className="text-xs font-black text-amber-800 font-mono mt-0.5">
-                        = Rs. 55 فی جار
+                        = Rs. 40 فی جار
                       </p>
                     </div>
                   </div>
@@ -3199,6 +3265,21 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   })
                 )}
               </div>
+            </div>
+
+            {/* Realized Profit Notice Banner */}
+            <div className="bg-emerald-50 border border-emerald-300 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-emerald-900 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>
+                  <strong>اصول منافع:</strong> سیلز، آمدن اور خالص منافع صرف <strong>ڈیلیور شدہ آرڈرز (Delivered Orders)</strong> سے محسوب کیا گیا ہے۔ کینسل یا ریٹرن شدہ آرڈرز منافع میں شامل نہیں ہیں۔
+                </span>
+              </div>
+              {currentMonthReport.totalOrdersBooked !== undefined && (
+                <span className="font-mono font-bold bg-white px-2.5 py-1 rounded-lg border border-emerald-200 text-stone-700 whitespace-nowrap">
+                  ڈیلیورڈ: {currentMonthReport.ordersCount} / کل بک شدہ: {currentMonthReport.totalOrdersBooked}
+                </span>
+              )}
             </div>
 
             {/* 4 Big KPI Cards */}

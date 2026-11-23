@@ -16,6 +16,7 @@ import { BrandLogo } from '@/components/common/BrandLogo';
 
 export function Header() {
   const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const itemCount = useCartStore((state) => state.getItemCount());
@@ -51,17 +52,19 @@ export function Header() {
           isScrolled ? 'shadow-md' : 'shadow-xs'
         }`}
       >
-        {/* Top Promotional Sale Banner */}
-        <div className="bg-gradient-to-r from-brand-green via-emerald-800 to-brand-green text-brand-cream text-[10px] sm:text-xs py-1.5 px-3 text-center font-medium tracking-wide flex items-center justify-center gap-2 border-b border-white/10 shadow-inner">
-          <span className="bg-red-600 text-white font-black text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded shadow-xs animate-pulse">
-            SALE LIVE
-          </span>
-          <span>
-            Special Discount: <strong>1L @ Rs. 700</strong> (was <span className="line-through opacity-75">Rs. 750</span>) • <strong>500ml @ Rs. 350</strong> (was <span className="line-through opacity-75">Rs. 450</span>) • <strong>FREE Delivery on 3L+!</strong>
-          </span>
-        </div>
+        {/* Top Promotional Sale Banner — Hidden on Admin to keep header elevated and avoid covering buttons */}
+        {!isAdmin && (
+          <div className="bg-gradient-to-r from-brand-green via-emerald-800 to-brand-green text-brand-cream text-[10px] sm:text-xs py-1.5 px-3 text-center font-medium tracking-wide flex items-center justify-center gap-2 border-b border-white/10 shadow-inner">
+            <span className="bg-red-600 text-white font-black text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded shadow-xs animate-pulse">
+              SALE LIVE
+            </span>
+            <span>
+              Special Discount: <strong>1L @ Rs. 700</strong> (was <span className="line-through opacity-75">Rs. 750</span>) • <strong>500ml @ Rs. 350</strong> (was <span className="line-through opacity-75">Rs. 450</span>) • <strong>FREE Delivery on 3L+!</strong>
+            </span>
+          </div>
+        )}
 
-        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isScrolled ? 'py-2' : 'py-2.5 sm:py-3'}`}>
+        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 transition-all duration-300 ${isAdmin ? 'py-1.5 sm:py-2' : isScrolled ? 'py-2' : 'py-2.5 sm:py-3'}`}>
           <div className="relative flex items-center justify-between">
             {/* ── Mobile Left: Drawer Trigger Menu (Mobile only) ── */}
             <div className="flex items-center lg:hidden z-10">
