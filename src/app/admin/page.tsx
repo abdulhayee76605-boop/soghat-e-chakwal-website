@@ -292,28 +292,21 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       isPrimary: true,
                     },
                   ],
-                  variants: p.variants.map((v) => {
-                    if (v.id === 'var-ghee-1kg') {
-                      return {
-                        ...v,
-                        name: '1 Liter / 1 KG Jar (۱ لیٹر / ۱ کلو جار)',
-                        price: 3999,
-                        compareAtPrice: 4500,
-                        costPrice: 3000,
-                        image: '/images/products/desi-ghee.jpg',
-                      };
-                    }
-                    if (v.id === 'var-ghee-500g') {
-                      return {
-                        ...v,
-                        price: 2099,
-                        compareAtPrice: 2350,
-                        costPrice: 1550,
-                        image: '/images/products/desi-ghee.jpg',
-                      };
-                    }
-                    return v;
-                  }),
+                  variants: p.variants
+                    .filter((v) => v.id !== 'var-ghee-500g')
+                    .map((v) => {
+                      if (v.id === 'var-ghee-1kg') {
+                        return {
+                          ...v,
+                          name: '1 Liter / 1 KG Jar (۱ لیٹر / ۱ کلو جار)',
+                          price: 3999,
+                          compareAtPrice: 4500,
+                          costPrice: 3000,
+                          image: '/images/products/desi-ghee.jpg',
+                        };
+                      }
+                      return v;
+                    }),
                 };
               }
               return p;

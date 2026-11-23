@@ -38,25 +38,32 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const router = useRouter();
   const { addItem, openCart } = useCartStore();
 
+  const isMustardOil = product.categorySlug === 'mustard-oil' || product.slug.includes('mustard-oil');
   const is1L = product.slug.includes('1-liter') || product.name.includes('1 Liter');
 
   // Selected variant state
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(
     product.variants[0] || {
       id: 'default',
-      name: is1L ? '1 Liter' : '500ml',
-      size: is1L ? '1L' : '500ml',
-      price: is1L ? 700 : 350,
-      compareAtPrice: is1L ? 750 : 450,
-      sku: is1L ? 'SEC-1L' : 'SEC-500ML',
-      weight: is1L ? 1000 : 500,
+      name: isMustardOil ? (is1L ? '1 Liter' : '500ml') : product.name,
+      size: isMustardOil ? (is1L ? '1L' : '500ml') : '1kg',
+      price: isMustardOil ? (is1L ? 700 : 350) : 3999,
+      compareAtPrice: isMustardOil ? (is1L ? 750 : 450) : 4500,
+      sku: isMustardOil ? (is1L ? 'SEC-1L' : 'SEC-500ML') : 'SEC-DG-1KG',
+      weight: 1000,
       inStock: true,
       stockQuantity: 50,
     }
   );
 
   // Active gallery image
-  const defaultImage = product.images?.[0]?.src || (is1L ? '/images/products/mustard-oil-1l.png' : '/images/products/mustard-oil-500ml.png');
+  const defaultImage =
+    product.images?.[0]?.src ||
+    (product.categorySlug === 'desi-ghee'
+      ? '/images/products/desi-ghee.jpg'
+      : is1L
+      ? '/images/products/mustard-oil-1l.png'
+      : '/images/products/mustard-oil-500ml.png');
   const [activeImage, setActiveImage] = useState<string>(defaultImage);
 
   const [quantity, setQuantity] = useState(1);
@@ -117,20 +124,21 @@ export function ProductDetail({ product }: ProductDetailProps) {
   };
 
   // Strictly relevant images only
-  const galleryImages = product.images && product.images.length > 0
-    ? product.images
-    : [
-        {
-          id: '1',
-          src: is1L ? '/images/products/mustard-oil-1l.png' : '/images/products/mustard-oil-500ml.png',
-          alt: product.name,
-        },
-        {
-          id: '2',
-          src: '/images/products/mustard-oil-duo.png',
-          alt: 'Soghat-e-Chakwal Mustard Oil Collection',
-        },
-      ];
+  const galleryImages =
+    product.images && product.images.length > 0
+      ? product.images
+      : [
+          {
+            id: '1',
+            src:
+              product.categorySlug === 'desi-ghee'
+                ? '/images/products/desi-ghee.jpg'
+                : is1L
+                ? '/images/products/mustard-oil-1l.png'
+                : '/images/products/mustard-oil-500ml.png',
+            alt: product.name,
+          },
+        ];
 
   return (
     <div className="bg-brand-ivory min-h-screen pt-28 pb-20">
@@ -199,7 +207,11 @@ export function ProductDetail({ product }: ProductDetailProps) {
               <div className="absolute top-5 left-5 z-20 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-brand-green/10 flex items-center gap-1.5 shadow-sm">
                 <Sparkles className="w-3.5 h-3.5 text-brand-gold" />
                 <span className="text-[11px] font-semibold text-brand-green tracking-wide">
-                  {is1L ? '1 Liter Family Size' : '500ml Compact Size'}
+                  {product.categorySlug === 'desi-ghee'
+                    ? '100% Pure Desi Ghee (خالص دیسی گھی)'
+                    : is1L
+                    ? '1 Liter Family Size'
+                    : '500ml Compact Size'}
                 </span>
               </div>
 
@@ -218,30 +230,32 @@ export function ProductDetail({ product }: ProductDetailProps) {
               </button>
             </div>
 
-            {/* Relevant Thumbnail Row */}
-            <div className={`grid ${galleryImages.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
-              {galleryImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImage(img.src)}
-                  className={`relative aspect-[4/3] rounded-2xl overflow-hidden border-2 transition-all p-1 bg-white ${
-                    activeImage === img.src
-                      ? 'border-brand-green ring-2 ring-brand-green/20 shadow-md scale-[1.02]'
-                      : 'border-brand-green/15 hover:border-brand-gold opacity-75 hover:opacity-100'
-                  }`}
-                >
-                  <div className="relative w-full h-full rounded-xl overflow-hidden bg-amber-50/30">
-                    <Image
-                      src={img.src}
-                      alt={img.alt || 'Product thumbnail'}
-                      fill
-                      unoptimized={true}
-                      className="object-contain object-center"
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
+            {/* Relevant Thumbnail Row (only if more than 1 image) */}
+            {galleryImages.length > 1 && (
+              <div className={`grid ${galleryImages.length === 2 ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImage(img.src)}
+                    className={`relative aspect-[4/3] rounded-2xl overflow-hidden border-2 transition-all p-1 bg-white ${
+                      activeImage === img.src
+                        ? 'border-brand-green ring-2 ring-brand-green/20 shadow-md scale-[1.02]'
+                        : 'border-brand-green/15 hover:border-brand-gold opacity-75 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="relative w-full h-full rounded-xl overflow-hidden bg-amber-50/30">
+                      <Image
+                        src={img.src}
+                        alt={img.alt || 'Product thumbnail'}
+                        fill
+                        unoptimized={true}
+                        className="object-contain object-center"
+                      />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Quality Guarantees Bar */}
             <div className="grid grid-cols-3 gap-3 pt-2">
@@ -307,70 +321,133 @@ export function ProductDetail({ product }: ProductDetailProps) {
               {product.shortDescription}
             </p>
 
-            {/* Quick Switcher Between Both Sizes (1L vs 500ml) */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-xs uppercase font-bold tracking-wider text-brand-charcoal">
-                  Available Sizes / Bottles
-                </label>
-                <span className="text-xs text-brand-terracotta font-medium">
-                  Active: {is1L ? '1 Liter (White Cap)' : '500ml (Yellow Cap)'}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Link
-                  href="/products/mustard-oil-1-liter"
-                  className={`p-4 rounded-2xl text-left border-2 transition-all ${
-                    is1L
-                      ? 'border-brand-green bg-brand-green text-brand-cream shadow-md'
-                      : 'border-brand-green/20 bg-white hover:border-brand-gold text-brand-charcoal'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-heading font-bold text-sm sm:text-base">1 Liter Bottle</p>
-                      <p className={`text-xs ${is1L ? 'text-brand-cream/80' : 'text-brand-charcoal/60'}`}>
-                        White Screw Cap
-                      </p>
+            {/* Size Switcher or Packaging Selector */}
+            {isMustardOil ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs uppercase font-bold tracking-wider text-brand-charcoal">
+                    Available Sizes / Bottles
+                  </label>
+                  <span className="text-xs text-brand-terracotta font-medium">
+                    Active: {is1L ? '1 Liter (White Cap)' : '500ml (Yellow Cap)'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link
+                    href="/products/mustard-oil-1-liter"
+                    className={`p-4 rounded-2xl text-left border-2 transition-all ${
+                      is1L
+                        ? 'border-brand-green bg-brand-green text-brand-cream shadow-md'
+                        : 'border-brand-green/20 bg-white hover:border-brand-gold text-brand-charcoal'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-heading font-bold text-sm sm:text-base">1 Liter Bottle</p>
+                        <p className={`text-xs ${is1L ? 'text-brand-cream/80' : 'text-brand-charcoal/60'}`}>
+                          White Screw Cap
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`block line-through text-[11px] font-semibold ${is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
+                          Rs. 750
+                        </span>
+                        <span className={`font-bold text-sm sm:text-base ${is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
+                          Rs. 700
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`block line-through text-[11px] font-semibold ${is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
-                        Rs. 750
-                      </span>
-                      <span className={`font-bold text-sm sm:text-base ${is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                        Rs. 700
-                      </span>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
 
-                <Link
-                  href="/products/mustard-oil-500ml"
-                  className={`p-4 rounded-2xl text-left border-2 transition-all ${
-                    !is1L
-                      ? 'border-brand-green bg-brand-green text-brand-cream shadow-md'
-                      : 'border-brand-green/20 bg-white hover:border-brand-gold text-brand-charcoal'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-heading font-bold text-sm sm:text-base">500ml Bottle</p>
-                      <p className={`text-xs ${!is1L ? 'text-brand-cream/80' : 'text-brand-charcoal/60'}`}>
-                        Yellow Screw Cap
-                      </p>
+                  <Link
+                    href="/products/mustard-oil-500ml"
+                    className={`p-4 rounded-2xl text-left border-2 transition-all ${
+                      !is1L
+                        ? 'border-brand-green bg-brand-green text-brand-cream shadow-md'
+                        : 'border-brand-green/20 bg-white hover:border-brand-gold text-brand-charcoal'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-heading font-bold text-sm sm:text-base">500ml Bottle</p>
+                        <p className={`text-xs ${!is1L ? 'text-brand-cream/80' : 'text-brand-charcoal/60'}`}>
+                          Yellow Screw Cap
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`block line-through text-[11px] font-semibold ${!is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
+                          Rs. 450
+                        </span>
+                        <span className={`font-bold text-sm sm:text-base ${!is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
+                          Rs. 350
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`block line-through text-[11px] font-semibold ${!is1L ? 'text-brand-cream/70' : 'text-stone-400'}`}>
-                        Rs. 450
-                      </span>
-                      <span className={`font-bold text-sm sm:text-base ${!is1L ? 'text-brand-gold' : 'text-brand-green'}`}>
-                        Rs. 350
-                      </span>
-                    </div>
-                  </div>
-                </Link>
+                  </Link>
+                </div>
               </div>
-            </div>
+            ) : product.variants.length > 1 ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs uppercase font-bold tracking-wider text-brand-charcoal">
+                    Available Packaging / Sizes
+                  </label>
+                  <span className="text-xs text-brand-terracotta font-medium">
+                    Active: {selectedVariant.name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {product.variants.map((v) => {
+                    const isSelected = selectedVariant.id === v.id;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVariant(v);
+                          if (v.image) setActiveImage(v.image);
+                        }}
+                        className={`p-4 rounded-2xl text-left border-2 transition-all ${
+                          isSelected
+                            ? 'border-brand-green bg-brand-green text-brand-cream shadow-md'
+                            : 'border-brand-green/20 bg-white hover:border-brand-gold text-brand-charcoal'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-heading font-bold text-sm sm:text-base">{v.name}</p>
+                            <p className={`text-xs ${isSelected ? 'text-brand-cream/80' : 'text-brand-charcoal/60'}`}>
+                              {v.size}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {v.compareAtPrice && v.compareAtPrice > v.price && (
+                              <span className={`block line-through text-[11px] font-semibold ${isSelected ? 'text-brand-cream/70' : 'text-stone-400'}`}>
+                                {formatPrice(v.compareAtPrice)}
+                              </span>
+                            )}
+                            <span className={`font-bold text-sm sm:text-base ${isSelected ? 'text-brand-gold' : 'text-brand-green'}`}>
+                              {formatPrice(v.price)}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2 p-4 bg-brand-cream/70 rounded-2xl border border-brand-gold/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs uppercase font-bold tracking-wider text-brand-charcoal">
+                    Pack Size / Packaging:
+                  </span>
+                  <span className="text-xs font-bold text-brand-green bg-brand-green/10 px-3 py-1 rounded-lg">
+                    {selectedVariant.name}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Quantity Selector */}
             <div className="space-y-2">

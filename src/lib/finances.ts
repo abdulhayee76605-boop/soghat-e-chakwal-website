@@ -13,13 +13,11 @@ export const defaultFinancialSettings: FinancialSettings = {
     'var-1l': 480,
     'var-500ml': 240,
     'var-ghee-1kg': 3000,        // Purchasing price for 1kg Desi Ghee
-    'var-ghee-500g': 1550,       // Purchasing price for 500g Desi Ghee
   },
   variantPackaging: {
     'var-1l': { materialCost: 60, laborCost: 5 },        // 60 bottle + 5 labour = 65 PKR
     'var-500ml': { materialCost: 40, laborCost: 5 },     // 40 bottle + 5 labour = 45 PKR
     'var-ghee-1kg': { materialCost: 65, laborCost: 5 },  // 65 jar + 5 labelling/labour = 70 PKR
-    'var-ghee-500g': { materialCost: 35, laborCost: 5 }, // 35 jar + 5 labelling/labour = 40 PKR
   },
   monthlyWholesaleRates: {},     // Per-month wholesale purchase cost & packaging overrides
   packagingCostPerOrder: 0,      // 100% manual - zero auto calculations

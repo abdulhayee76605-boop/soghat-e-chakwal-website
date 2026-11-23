@@ -243,7 +243,7 @@ export const products: Product[] = [
       {
         question: 'What packaging sizes are available?',
         answer:
-          'Available in 1 KG (1000g) Jar and 500g Jar sizes with sealed leak-proof caps.',
+          'Available in 1 Litre / 1 KG (1000g) Jar with sealed leak-proof cap.',
       },
     ],
     images: [
@@ -269,19 +269,6 @@ export const products: Product[] = [
         image: '/images/products/desi-ghee.jpg',
         inStock: true,
         stockQuantity: 40,
-      },
-      {
-        id: 'var-ghee-500g',
-        name: '500g Jar (۵۰۰ گرام جار)',
-        size: '500g',
-        price: 2099,
-        compareAtPrice: 2350,
-        costPrice: 1550, // Wholesale / Purchase cost in PKR
-        sku: 'SEC-DG-500G',
-        weight: 500,
-        image: '/images/products/desi-ghee.jpg',
-        inStock: true,
-        stockQuantity: 50,
       },
     ],
     isActive: true,

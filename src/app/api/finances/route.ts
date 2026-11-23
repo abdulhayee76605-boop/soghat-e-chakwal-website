@@ -12,13 +12,11 @@ let serverSettings: FinancialSettings = {
     'var-1l': 480,
     'var-500ml': 240,
     'var-ghee-1kg': 3000,
-    'var-ghee-500g': 1550,
   },
   variantPackaging: {
     'var-1l': { materialCost: 60, laborCost: 5 },
     'var-500ml': { materialCost: 40, laborCost: 5 },
     'var-ghee-1kg': { materialCost: 65, laborCost: 5 },
-    'var-ghee-500g': { materialCost: 35, laborCost: 5 },
   },
   monthlyWholesaleRates: {},
   packagingCostPerOrder: 0,
