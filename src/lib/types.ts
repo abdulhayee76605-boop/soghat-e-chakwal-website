@@ -188,8 +188,9 @@ export interface ExpenseEntry {
 export interface FinancialSettings {
   defaultCostPrice1L: number;    // Wholesale / Purchase cost per 1L bottle (e.g. 480 PKR)
   defaultCostPrice500ml: number; // Wholesale / Purchase cost per 500ml bottle (e.g. 240 PKR)
-  packagingCostPerOrder: number; // Estimated packaging cost per parcel (e.g. 40 PKR)
-  courierCostPerOrder: number;   // Estimated actual courier delivery fee per parcel (e.g. 200 PKR)
+  monthlyWholesaleRates?: Record<string, { cost1L: number; cost500ml: number }>; // Custom rate per month, e.g. { "2026-11": { cost1L: 480, cost500ml: 240 } }
+  packagingCostPerOrder?: number;
+  courierCostPerOrder?: number;
 }
 
 export interface MonthlyFinancialReport {

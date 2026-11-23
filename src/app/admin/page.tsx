@@ -68,7 +68,9 @@ import {
   getStoredExpenses,
   saveStoredExpenses,
   addExpense,
+  updateExpense,
   deleteExpense,
+  clearAllExpenses,
   fetchServerExpenses,
   getStoredFinancialSettings,
   saveFinancialSettings,
@@ -111,14 +113,19 @@ export default function AdminPage() {
   const [showMonthlyStatementModal, setShowMonthlyStatementModal] = useState(false);
   const [showFinSettingsModal, setShowFinSettingsModal] = useState(false);
 
-  // New expense form fields
+  // New / Edit expense form fields
+  const [editingExpense, setEditingExpense] = useState<ExpenseEntry | null>(null);
   const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory>('ads');
   const [newExpenseTitle, setNewExpenseTitle] = useState('');
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().substring(0, 10));
   const [newExpenseNotes, setNewExpenseNotes] = useState('');
 
-  // Add Product Wholesale Cost fields
+  // Per-Month Wholesale Purchase Cost inputs (oil bought per liter & 500ml in that month)
+  const [monthCost1L, setMonthCost1L] = useState<string>('480');
+  const [monthCost500ml, setMonthCost500ml] = useState<string>('240');
+
+  // Add Product Wholesale Cost fields (catalog defaults)
   const [newCost1L, setNewCost1L] = useState('480');
   const [newCost500ml, setNewCost500ml] = useState('240');
 
@@ -510,12 +517,66 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     }
   };
 
+  // Sync monthly wholesale purchase inputs when selectedMonth or settings change
+  useEffect(() => {
+    const rate = finSettings.monthlyWholesaleRates?.[selectedMonth];
+    setMonthCost1L(
+      rate && typeof rate.cost1L === 'number' && rate.cost1L > 0
+        ? rate.cost1L.toString()
+        : (finSettings.defaultCostPrice1L || 480).toString()
+    );
+    setMonthCost500ml(
+      rate && typeof rate.cost500ml === 'number' && rate.cost500ml > 0
+        ? rate.cost500ml.toString()
+        : (finSettings.defaultCostPrice500ml || 240).toString()
+    );
+  }, [selectedMonth, finSettings]);
+
+  const handleSaveMonthWholesaleRates = () => {
+    const cost1 = Math.max(0, Number(monthCost1L) || 0);
+    const cost500 = Math.max(0, Number(monthCost500ml) || 0);
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      monthlyWholesaleRates: {
+        ...(finSettings.monthlyWholesaleRates || {}),
+        [selectedMonth]: { cost1L: cost1, cost500ml: cost500 },
+      },
+    };
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+    setNotificationToast(`خریداری ریٹ برائے ${selectedMonth} محفوظ ہو گیا (1L: Rs. ${cost1}, 500ml: Rs. ${cost500})`);
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
   const handleCreateExpense = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(newExpenseAmount);
     if (!amt || amt <= 0 || !newExpenseTitle.trim()) return;
 
     const month = newExpenseDate.substring(0, 7) || selectedMonth;
+
+    if (editingExpense) {
+      const updated: ExpenseEntry = {
+        ...editingExpense,
+        date: newExpenseDate,
+        month,
+        category: newExpenseCategory,
+        title: newExpenseTitle.trim(),
+        amount: amt,
+        notes: newExpenseNotes.trim() || undefined,
+      };
+      updateExpense(updated);
+      setExpenses((prev) => prev.map((exp) => (exp.id === updated.id ? updated : exp)));
+      setEditingExpense(null);
+      setShowAddExpenseModal(false);
+      setNewExpenseTitle('');
+      setNewExpenseAmount('');
+      setNewExpenseNotes('');
+      setNotificationToast(`خرچ کامیابی سے تبدیل ہو گیا: Rs. ${amt}`);
+      setTimeout(() => setNotificationToast(null), 3000);
+      return;
+    }
+
     const created = addExpense({
       date: newExpenseDate,
       month,
@@ -530,14 +591,28 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     setNewExpenseTitle('');
     setNewExpenseAmount('');
     setNewExpenseNotes('');
-    setNotificationToast(`Expense of Rs. ${amt} added for ${newExpenseCategory.toUpperCase()}!`);
+    setNotificationToast(`نیا خرچ شامل ہو گیا: Rs. ${amt} برائے ${newExpenseCategory.toUpperCase()}`);
     setTimeout(() => setNotificationToast(null), 3000);
   };
 
-  const handleDeleteExpense = (id: string) => {
+  const handleOpenEditExpense = (exp: ExpenseEntry) => {
+    setEditingExpense(exp);
+    setNewExpenseCategory(exp.category);
+    setNewExpenseTitle(exp.title);
+    setNewExpenseAmount(exp.amount.toString());
+    setNewExpenseDate(exp.date);
+    setNewExpenseNotes(exp.notes || '');
+    setShowAddExpenseModal(true);
+  };
+
+  const handleDeleteExpense = (id: string, title?: string) => {
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(`کیا آپ واقعی اس خرچے کو مٹانا چاہتے ہیں؟\n${title ? `"${title}"` : ''}`);
+      if (!confirmed) return;
+    }
     deleteExpense(id);
     setExpenses((prev) => prev.filter((e) => e.id !== id));
-    setNotificationToast('Expense record deleted.');
+    setNotificationToast('خرچ کامیابی سے مٹا دیا گیا۔ (Expense deleted)');
     setTimeout(() => setNotificationToast(null), 2500);
   };
 
@@ -701,8 +776,8 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       }, 0)
     );
   }, 0);
-  const allTimeAutoPackagingAndCourier = orders.length * (finSettings.packagingCostPerOrder + finSettings.courierCostPerOrder);
-  const allTimeTotalExpenses = allTimeCogs + allTimeExpensesLogged + allTimeAutoPackagingAndCourier;
+  // All-time totals: COGS + manually logged business expenses (zero fake estimations)
+  const allTimeTotalExpenses = allTimeCogs + allTimeExpensesLogged;
   const allTimeNetProfit = totalSalesAllTime - allTimeTotalExpenses;
 
   // Monthly Report computations
@@ -1994,6 +2069,59 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               </div>
             </div>
 
+            {/* 🏷️ MONTHLY WHOLESALE PURCHASE RATE OVERRIDE (خریداری قیمت برائے منتخب مہینہ) */}
+            <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-xl bg-amber-500 text-white text-xs">🏷️</span>
+                    <h4 className="font-heading font-black text-base text-stone-900">
+                      اس مہینے ({currentMonthReport.monthName}) مال کی خریداری لاگت (Wholesale Purchase Cost)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-stone-600 max-w-xl">
+                    مارکیٹ ریٹ ہر مہینے مختلف ہوتا ہے۔ اس مہینے آپ کو تیل جس ریٹ پر پڑا (فی لیٹر یا 500ml)، وہ یہاں درج کریں تاکہ اس مہینے کا خالص منافع 100% درست نکلے۔
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                  <div className="bg-white border border-amber-300 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-2xs">
+                    <span className="text-xs font-bold text-stone-700">1 Liter لاگت:</span>
+                    <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={monthCost1L}
+                      onChange={(e) => setMonthCost1L(e.target.value)}
+                      placeholder="480"
+                      className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="bg-white border border-amber-300 rounded-2xl px-3.5 py-2 flex items-center gap-2 shadow-2xs">
+                    <span className="text-xs font-bold text-stone-700">500ml لاگت:</span>
+                    <span className="text-xs font-mono font-bold text-stone-400">Rs.</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={monthCost500ml}
+                      onChange={(e) => setMonthCost500ml(e.target.value)}
+                      placeholder="240"
+                      className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveMonthWholesaleRates}
+                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  >
+                    محفوظ کریں (Save Rates)
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* 4 Big KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Card 1: Total Net Sales */}
@@ -2234,11 +2362,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowAddExpenseModal(true)}
+                    onClick={() => {
+                      setEditingExpense(null);
+                      setNewExpenseCategory('ads');
+                      setNewExpenseTitle('');
+                      setNewExpenseAmount('');
+                      setNewExpenseNotes('');
+                      setShowAddExpenseModal(true);
+                    }}
                     className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5 text-brand-gold" />
-                    + Add Expense Entry
+                    + نیا خرچ درج کریں (Add Expense)
                   </button>
                 </div>
               </div>
@@ -2246,17 +2381,20 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               {selectedMonthExpenses.length === 0 ? (
                 <div className="py-10 text-center space-y-3 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
                   <p className="text-sm font-semibold text-stone-600">
-                    No custom expense records logged yet for {currentMonthReport.monthName}.
+                    ابھی تک {currentMonthReport.monthName} کا کوئی خرچہ درج نہیں کیا گیا۔
                   </p>
                   <p className="text-xs text-stone-500 max-w-md mx-auto">
-                    (Standard baseline packaging @ Rs. {finSettings.packagingCostPerOrder}/order and courier @ Rs. {finSettings.courierCostPerOrder}/order are calculated automatically).
+                    (تمام اخراجات 100% مینوئل ہیں۔ آپ فیس بک اشتہارات، پیکنگ میٹریل، یا کوریئر ڈلیوری کا خرچ اوپر دیے گئے بٹنوں سے خود درج کر سکتے ہیں)۔
                   </p>
                   <button
-                    onClick={() => setShowAddExpenseModal(true)}
+                    onClick={() => {
+                      setEditingExpense(null);
+                      setShowAddExpenseModal(true);
+                    }}
                     className="inline-flex items-center gap-1.5 bg-brand-green text-brand-cream px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-green-light"
                   >
                     <Plus className="w-3.5 h-3.5 text-brand-gold" />
-                    Log First Expense for {currentMonthReport.monthName}
+                    پہلا خرچ درج کریں (Log First Expense)
                   </button>
                 </div>
               ) : (
@@ -2269,7 +2407,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                         <th className="py-3 px-3">Title / Description</th>
                         <th className="py-3 px-3">Notes &amp; Details</th>
                         <th className="py-3 px-3 text-right">Amount (PKR)</th>
-                        <th className="py-3 px-3 text-center">Action</th>
+                        <th className="py-3 px-3 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -2302,14 +2440,25 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                           <td className="py-3 px-3 text-right font-mono font-bold text-red-600 text-sm">
                             {formatPrice(exp.amount)}
                           </td>
-                          <td className="py-3 px-3 text-center">
-                            <button
-                              onClick={() => handleDeleteExpense(exp.id)}
-                              className="text-stone-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors"
-                              title="Delete expense"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenEditExpense(exp)}
+                                className="inline-flex items-center gap-1 text-stone-700 hover:text-stone-950 bg-stone-100 hover:bg-stone-200 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
+                                title="Edit this entry"
+                              >
+                                <Edit3 className="w-3 h-3 text-stone-500" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExpense(exp.id, exp.title)}
+                                className="inline-flex items-center gap-1 text-red-600 hover:text-white bg-red-50 hover:bg-red-600 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all shadow-2xs"
+                                title="Delete this entry"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Delete (مٹائیں)
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -2956,18 +3105,21 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           />
         )}
 
-        {/* ── Add Expense Entry Modal ── */}
+        {/* ── Add / Edit Expense Entry Modal ── */}
         {showAddExpenseModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-stone-200 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex justify-between items-center border-b border-stone-200 pb-3">
                 <h3 className="font-heading font-black text-lg text-brand-charcoal flex items-center gap-2">
                   <Receipt className="w-5 h-5 text-brand-green" />
-                  Log Business Expense (خرچ درج کریں)
+                  {editingExpense ? 'خرچہ تبدیل کریں (Edit Expense)' : 'نیا خرچ درج کریں (Log Business Expense)'}
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setShowAddExpenseModal(false)}
+                  onClick={() => {
+                    setShowAddExpenseModal(false);
+                    setEditingExpense(null);
+                  }}
                   className="text-stone-400 hover:text-stone-600"
                 >
                   <X className="w-5 h-5" />
@@ -2976,7 +3128,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
               <form onSubmit={handleCreateExpense} className="space-y-3.5 text-xs">
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Expense Category</label>
+                  <label className="font-bold text-stone-700 block mb-1">Expense Category (خرچ کی قسم)</label>
                   <select
                     value={newExpenseCategory}
                     onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
@@ -2984,15 +3136,15 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   >
                     <option value="ads">📱 Social Media Ads (فیس بک، انسٹاگرام، گوگل ایڈز)</option>
                     <option value="packaging">📦 Packaging Materials (کارٹن، ببل ریپ، بوتلیں، ٹیپ)</option>
-                    <option value="delivery">🚚 Courier Delivery (کوریئر کمپنیوں کو ادا کردہ اصل فیس)</option>
-                    <option value="operational">🏢 Operational &amp; Rent (دکان کا کرایہ، بجلی کا بل، ملازمین)</option>
+                    <option value="delivery">🚚 Courier Delivery (ٹی سی ایس، لیپرڈز، ٹریکس وغیرہ کا بل)</option>
+                    <option value="operational">🏢 Operational &amp; Rent (دکان/فیکٹری کا کرایہ، بجلی، ملازمین کی تنخواہ)</option>
                     <option value="inventory">🌾 Raw Material &amp; Inventory (خام مال، بیج، گھی کی خریداری)</option>
                     <option value="other">📝 Miscellaneous (دیگر متفرق اخراجات)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Expense Title / Description</label>
+                  <label className="font-bold text-stone-700 block mb-1">Expense Title / Description (تفصیل)</label>
                   <input
                     type="text"
                     required
@@ -3005,7 +3157,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-stone-700 block mb-1">Amount (PKR)</label>
+                    <label className="font-bold text-stone-700 block mb-1">Amount (رقم - PKR)</label>
                     <div className="relative">
                       <span className="absolute left-3 top-2 text-stone-400 font-bold text-xs">Rs.</span>
                       <input
@@ -3021,7 +3173,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   </div>
 
                   <div>
-                    <label className="font-bold text-stone-700 block mb-1">Expense Date</label>
+                    <label className="font-bold text-stone-700 block mb-1">Expense Date (تاریخ)</label>
                     <input
                       type="date"
                       required
@@ -3033,12 +3185,12 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                 </div>
 
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Notes &amp; Particulars (Optional)</label>
+                  <label className="font-bold text-stone-700 block mb-1">Notes &amp; Particulars (اضافی تفصیل - اختیاری)</label>
                   <textarea
                     rows={2}
                     value={newExpenseNotes}
                     onChange={(e) => setNewExpenseNotes(e.target.value)}
-                    placeholder="e.g. Run on Meta Ads Manager targeting Rawalpindi/Islamabad"
+                    placeholder="e.g. TCS Invoice #12345 or Meta Ad receipt"
                     className="w-full px-3 py-2 border rounded-xl resize-none"
                   />
                 </div>
@@ -3048,14 +3200,17 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                     type="submit"
                     className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light transition-all shadow-sm"
                   >
-                    Save Expense Record
+                    {editingExpense ? 'تبدیلی محفوظ کریں (Update Record)' : 'خرچ محفوظ کریں (Save Expense Record)'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowAddExpenseModal(false)}
+                    onClick={() => {
+                      setShowAddExpenseModal(false);
+                      setEditingExpense(null);
+                    }}
                     className="bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200"
                   >
-                    Cancel
+                    منسوخ (Cancel)
                   </button>
                 </div>
               </form>
@@ -3083,7 +3238,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
 
               <form onSubmit={handleSaveFinSettings} className="space-y-3.5 text-xs">
                 <p className="text-stone-500 text-[11px]">
-                  یہ بنیادی ریٹس ہر آرڈر کا خود بخود منافع اور لاگت حساب کرنے کے لیے استعمال ہوتے ہیں۔
+                  یہ ڈیفالٹ خریداری ریٹس ہیں جو تب استعمال ہوں گے جب کسی مہینے کا الگ ریٹ نہ دیا گیا ہو۔ تمام دیگر اخراجات (اشتہارات، پیکنگ، کوریئر) 100% مینوئل ہیں۔
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -3098,6 +3253,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       }
                       className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
                     />
+                    <span className="text-[10px] text-stone-400">1 لیٹر بوتل خریداری ریٹ</span>
                   </div>
                   <div>
                     <label className="font-bold text-stone-700 block mb-1">Default 500ml Wholesale Cost (PKR)</label>
@@ -3110,36 +3266,15 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       }
                       className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
                     />
+                    <span className="text-[10px] text-stone-400">500ml بوتل خریداری ریٹ</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">Packaging Cost / Order (PKR)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={finSettings.packagingCostPerOrder}
-                      onChange={(e) =>
-                        setFinSettings({ ...finSettings, packagingCostPerOrder: Number(e.target.value) || 0 })
-                      }
-                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
-                    />
-                    <span className="text-[10px] text-stone-400">Carton, tape, bubble wrap</span>
-                  </div>
-                  <div>
-                    <label className="font-bold text-stone-700 block mb-1">Courier Fee / Order (PKR)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={finSettings.courierCostPerOrder}
-                      onChange={(e) =>
-                        setFinSettings({ ...finSettings, courierCostPerOrder: Number(e.target.value) || 0 })
-                      }
-                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
-                    />
-                    <span className="text-[10px] text-stone-400">Paid to TCS/Leopards</span>
-                  </div>
+                <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 text-stone-600 text-[11px] space-y-1">
+                  <p className="font-bold text-stone-800">📌 نوٹ برائے اخراجات (100% Manual Entry):</p>
+                  <p>
+                    فیس بک ایڈز کی لاگت، کوریئر کمپنیوں کا اصل بل، اور پیکنگ میٹریل کی خریداری آپ ماہانہ رپورٹ کے اندر دیے گئے بٹنوں کے ذریعے خود مینوئل درج کر سکتے ہیں، اور غلط انٹری کو کسی بھی وقت ڈیلیٹ کر سکتے ہیں۔
+                  </p>
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -3147,7 +3282,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                     type="submit"
                     className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light"
                   >
-                    Save Base Rates
+                    Save Base Rates (محفوظ کریں)
                   </button>
                   <button
                     type="button"

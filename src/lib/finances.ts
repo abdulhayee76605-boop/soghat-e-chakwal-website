@@ -9,8 +9,9 @@ import { formatPrice } from './utils';
 export const defaultFinancialSettings: FinancialSettings = {
   defaultCostPrice1L: 480,       // Wholesale / Purchase cost per 1L bottle
   defaultCostPrice500ml: 240,    // Wholesale / Purchase cost per 500ml bottle
-  packagingCostPerOrder: 35,     // Corrugated box, tape, flyer pocket, bubble wrap
-  courierCostPerOrder: 200,      // Actual courier fee charged by TCS/Leopards
+  monthlyWholesaleRates: {},     // Per-month wholesale purchase cost overrides
+  packagingCostPerOrder: 0,      // 100% manual - zero auto calculations
+  courierCostPerOrder: 0,        // 100% manual - zero auto calculations
 };
 
 // ── LOCAL STORAGE KEYS ──
@@ -23,7 +24,15 @@ export function getStoredExpenses(): ExpenseEntry[] {
     const raw = localStorage.getItem(EXPENSES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed)) {
+      // Purge any legacy demo entries so user has 100% manual control
+      const cleaned = parsed.filter((e) => e && e.id && !e.id.startsWith('exp-demo'));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+      return cleaned;
+    }
+    return [];
   } catch {
     return [];
   }
@@ -113,6 +122,19 @@ export function addExpense(entry: Omit<ExpenseEntry, 'id' | 'createdAt'>): Expen
   return newExpense;
 }
 
+export function updateExpense(updated: ExpenseEntry): void {
+  if (typeof window !== 'undefined') {
+    const expenses = getStoredExpenses().map((e) => (e.id === updated.id ? updated : e));
+    saveStoredExpenses(expenses);
+
+    fetch('/api/finances', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'update_expense', expense: updated }),
+    }).catch(() => {});
+  }
+}
+
 export function deleteExpense(id: string): void {
   if (typeof window !== 'undefined') {
     const expenses = getStoredExpenses().filter((e) => e.id !== id);
@@ -148,10 +170,22 @@ export function calculateMonthlyReport(
     return o.createdAt.startsWith(targetMonth);
   });
 
-  // Filter expenses for the target month
+  // Filter expenses for the target month (ignoring any legacy demo entries)
   const monthExpenses = expenses.filter((e) => {
+    if (e.id && e.id.startsWith('exp-demo')) return false;
     return e.month === targetMonth || (e.date && e.date.startsWith(targetMonth));
   });
+
+  // Determine monthly wholesale purchase cost (100% manual per-month rates)
+  const monthWholesale = settings.monthlyWholesaleRates?.[targetMonth];
+  const rate1L =
+    monthWholesale && typeof monthWholesale.cost1L === 'number' && monthWholesale.cost1L > 0
+      ? monthWholesale.cost1L
+      : (settings.defaultCostPrice1L || 480);
+  const rate500ml =
+    monthWholesale && typeof monthWholesale.cost500ml === 'number' && monthWholesale.cost500ml > 0
+      ? monthWholesale.cost500ml
+      : (settings.defaultCostPrice500ml || 240);
 
   // Calculate order items & COGS
   let bottles1LSold = 0;
@@ -182,21 +216,15 @@ export function calculateMonthlyReport(
         totalLiters += 0.5 * qty;
       }
 
-      // Cost price: prioritize variant costPrice, else fallback to settings
-      const unitCost =
-        item.variant.costPrice && item.variant.costPrice > 0
-          ? item.variant.costPrice
-          : is1L
-          ? settings.defaultCostPrice1L
-          : settings.defaultCostPrice500ml;
-
+      // Cost price: prioritize month's wholesale rate entered by the user
+      const unitCost = is1L ? rate1L : rate500ml;
       cogsProductCost += unitCost * qty;
     });
   });
 
   const netRevenue = Math.max(0, grossSales - discountTotal + shippingCollected);
 
-  // Categorize expenses
+  // Categorize expenses (100% manual entries entered by the user)
   let adSpend = 0;
   let packagingExpensesLogged = 0;
   let courierExpensesLogged = 0;
@@ -226,12 +254,9 @@ export function calculateMonthlyReport(
     }
   });
 
-  // Automated packaging & courier calculations per parcel if not logged manually
-  const packagingAutoCost = monthOrders.length * settings.packagingCostPerOrder;
-  const courierAutoCost = monthOrders.length * settings.courierCostPerOrder;
-
-  const totalPackagingCost = packagingExpensesLogged > 0 ? packagingExpensesLogged : packagingAutoCost;
-  const totalCourierCost = courierExpensesLogged > 0 ? courierExpensesLogged : courierAutoCost;
+  // 100% MANUAL entries - zero automatic multiplication or baseline assumptions
+  const totalPackagingCost = packagingExpensesLogged;
+  const totalCourierCost = courierExpensesLogged;
 
   const totalExpenses =
     cogsProductCost + adSpend + totalPackagingCost + totalCourierCost + operationalCost + otherExpenses;
