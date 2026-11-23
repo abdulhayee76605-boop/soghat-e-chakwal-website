@@ -44,8 +44,40 @@ import {
   Bell,
   Mail,
   Edit3,
+  DollarSign,
+  Receipt,
+  Calendar,
+  PieChart,
+  FileSpreadsheet,
+  TrendingDown,
+  X,
 } from 'lucide-react';
-import { Product, Order, OrderStatus, PaymentStatus, CartItem, ProductVariant } from '@/lib/types';
+import {
+  Product,
+  Order,
+  OrderStatus,
+  PaymentStatus,
+  CartItem,
+  ProductVariant,
+  ExpenseEntry,
+  ExpenseCategory,
+  FinancialSettings,
+  MonthlyFinancialReport,
+} from '@/lib/types';
+import {
+  getStoredExpenses,
+  saveStoredExpenses,
+  addExpense,
+  deleteExpense,
+  fetchServerExpenses,
+  getStoredFinancialSettings,
+  saveFinancialSettings,
+  calculateMonthlyReport,
+  getAvailableMonths,
+  defaultFinancialSettings,
+  generateMonthlyReportCSV,
+} from '@/lib/finances';
+import { MonthlyReportModal } from '@/components/admin/MonthlyReportModal';
 import { products as initialProducts, categories as initialCategories } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { siteConfig } from '@/lib/config';
@@ -69,7 +101,26 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState(false);
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'categories' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'categories' | 'reports' | 'settings'>('overview');
+
+  // Financial & Expense States (P&L, Wholesale, Ad Costs, Packaging, Delivery)
+  const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
+  const [finSettings, setFinSettings] = useState<FinancialSettings>(defaultFinancialSettings);
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().substring(0, 7));
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showMonthlyStatementModal, setShowMonthlyStatementModal] = useState(false);
+  const [showFinSettingsModal, setShowFinSettingsModal] = useState(false);
+
+  // New expense form fields
+  const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory>('ads');
+  const [newExpenseTitle, setNewExpenseTitle] = useState('');
+  const [newExpenseAmount, setNewExpenseAmount] = useState('');
+  const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().substring(0, 10));
+  const [newExpenseNotes, setNewExpenseNotes] = useState('');
+
+  // Add Product Wholesale Cost fields
+  const [newCost1L, setNewCost1L] = useState('480');
+  const [newCost500ml, setNewCost500ml] = useState('240');
 
   // State data
   const [productList, setProductList] = useState<Product[]>(initialProducts);
@@ -426,9 +477,11 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
   useEffect(() => {
     if (isAuthenticated) {
       fetchOrders();
+      fetchFinances();
       // Auto-refresh every 5 seconds for live visitor sessions, checkouts, and incoming customer orders
       const interval = setInterval(() => {
         fetchOrders();
+        fetchFinances();
       }, 5000);
       return () => clearInterval(interval);
     }
@@ -444,6 +497,76 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       setOrders(getStoredOrders());
       setFunnel(getFunnelMetrics());
     }
+  };
+
+  const fetchFinances = async () => {
+    try {
+      const data = await fetchServerExpenses();
+      setExpenses(data.expenses);
+      setFinSettings(data.settings);
+    } catch {
+      setExpenses(getStoredExpenses());
+      setFinSettings(getStoredFinancialSettings());
+    }
+  };
+
+  const handleCreateExpense = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(newExpenseAmount);
+    if (!amt || amt <= 0 || !newExpenseTitle.trim()) return;
+
+    const month = newExpenseDate.substring(0, 7) || selectedMonth;
+    const created = addExpense({
+      date: newExpenseDate,
+      month,
+      category: newExpenseCategory,
+      title: newExpenseTitle.trim(),
+      amount: amt,
+      notes: newExpenseNotes.trim() || undefined,
+    });
+
+    setExpenses((prev) => [created, ...prev]);
+    setShowAddExpenseModal(false);
+    setNewExpenseTitle('');
+    setNewExpenseAmount('');
+    setNewExpenseNotes('');
+    setNotificationToast(`Expense of Rs. ${amt} added for ${newExpenseCategory.toUpperCase()}!`);
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    deleteExpense(id);
+    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    setNotificationToast('Expense record deleted.');
+    setTimeout(() => setNotificationToast(null), 2500);
+  };
+
+  const handleSaveFinSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveFinancialSettings(finSettings);
+    setShowFinSettingsModal(false);
+    setNotificationToast('Base financial rates & COGS settings updated!');
+    setTimeout(() => setNotificationToast(null), 3000);
+  };
+
+  const updateVariantCostPrice = (productId: string, variantId: string, newCost: number) => {
+    const updated = productList.map((p) => {
+      if (p.id === productId) {
+        return {
+          ...p,
+          variants: p.variants.map((v) => {
+            if (v.id === variantId) {
+              return { ...v, costPrice: Math.max(0, newCost) };
+            }
+            return v;
+          }),
+        };
+      }
+      return p;
+    });
+    saveProductList(updated);
+    setNotificationToast(`Wholesale cost updated to Rs. ${newCost}`);
+    setTimeout(() => setNotificationToast(null), 2500);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -520,6 +643,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           name: '1 Liter',
           size: '1L',
           price: Number(newPrice1L) || 700,
+          costPrice: Number(newCost1L) || 480,
           sku: `SEC-${Date.now()}-1L`,
           weight: 1000,
           inStock: true,
@@ -530,6 +654,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           name: '500ml',
           size: '500ml',
           price: Number(newPrice500ml) || 350,
+          costPrice: Number(newCost500ml) || 240,
           sku: `SEC-${Date.now()}-500ML`,
           weight: 500,
           inStock: true,
@@ -552,9 +677,40 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     saveProductList(productList.filter((p) => p.id !== id));
   };
 
-  // Analytics
+  // Analytics & Financial Computations
   const totalRevenue = orders.reduce((sum, o) => sum + (o.paymentStatus === 'received' ? o.total : 0), 0);
+  const totalSalesAllTime = orders.reduce((sum, o) => sum + (o.total || 0), 0);
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
+
+  const allTimeExpensesLogged = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const allTimeCogs = orders.reduce((sum, o) => {
+    return (
+      sum +
+      o.items.reduce((iSum, item) => {
+        const is1L =
+          item.variant.size?.toLowerCase().includes('1l') ||
+          item.variant.name.includes('1') ||
+          item.product.name.includes('1 Liter');
+        const cost =
+          item.variant.costPrice && item.variant.costPrice > 0
+            ? item.variant.costPrice
+            : is1L
+            ? finSettings.defaultCostPrice1L
+            : finSettings.defaultCostPrice500ml;
+        return iSum + cost * (item.quantity || 1);
+      }, 0)
+    );
+  }, 0);
+  const allTimeAutoPackagingAndCourier = orders.length * (finSettings.packagingCostPerOrder + finSettings.courierCostPerOrder);
+  const allTimeTotalExpenses = allTimeCogs + allTimeExpensesLogged + allTimeAutoPackagingAndCourier;
+  const allTimeNetProfit = totalSalesAllTime - allTimeTotalExpenses;
+
+  // Monthly Report computations
+  const availableMonths = getAvailableMonths(orders, expenses);
+  const currentMonthReport: MonthlyFinancialReport = calculateMonthlyReport(selectedMonth, orders, expenses, finSettings);
+  const selectedMonthExpenses: ExpenseEntry[] = expenses.filter(
+    (e) => e.month === selectedMonth || (e.date && e.date.startsWith(selectedMonth))
+  );
 
   if (!isAuthenticated) {
     return (
@@ -669,6 +825,18 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
             >
               <Layers className="w-4 h-4" />
               Categories ({initialCategories.length})
+            </button>
+
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'reports'
+                  ? 'bg-brand-gold text-brand-charcoal font-bold'
+                  : 'text-brand-cream/80 hover:bg-white/10'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              P&amp;L Reports &amp; Expenses
             </button>
 
             <button
@@ -922,43 +1090,72 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
                 <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
+                  Total Sales Value
+                </p>
+                <p className="font-heading text-3xl font-bold text-brand-green mt-2">
+                  {formatPrice(totalSalesAllTime)}
+                </p>
+                <p className="text-[11px] text-stone-500 mt-1">From all customer orders</p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
+                  Total Expenses
+                </p>
+                <p className="font-heading text-3xl font-bold text-red-600 mt-2">
+                  {formatPrice(allTimeTotalExpenses)}
+                </p>
+                <p className="text-[11px] text-stone-500 mt-1">Wholesale + Ads + Delivery</p>
+              </div>
+
+              <div className={`p-6 rounded-3xl border shadow-sm ${allTimeNetProfit >= 0 ? 'bg-emerald-50/70 border-emerald-300' : 'bg-red-50/70 border-red-300'}`}>
+                <p className={`text-xs font-bold uppercase tracking-wider ${allTimeNetProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  Net {allTimeNetProfit >= 0 ? 'Profit (منافع)' : 'Loss (نقصان)'}
+                </p>
+                <p className={`font-heading text-3xl font-bold mt-2 ${allTimeNetProfit >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
+                  {formatPrice(allTimeNetProfit)}
+                </p>
+                <p className={`text-[11px] font-bold mt-1 ${allTimeNetProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                  {allTimeNetProfit >= 0 ? '▲ Net Positive Inflow' : '▼ Net Deficit'}
+                </p>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
+                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
                   Total Orders
                 </p>
                 <p className="font-heading text-3xl font-bold text-brand-charcoal mt-2">
                   {orders.length}
                 </p>
-                <p className="text-[11px] text-stone-500 mt-1">Recorded transactions</p>
+                <p className="text-[11px] text-stone-500 mt-1">{pendingOrdersCount} pending confirmation</p>
               </div>
+            </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-                  Pending Orders
+            {/* Financial Performance Banner */}
+            <div className="bg-gradient-to-r from-emerald-950 via-brand-green to-emerald-900 text-white rounded-3xl p-6 shadow-md border border-brand-gold/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="bg-brand-gold text-brand-charcoal text-[10px] font-black uppercase px-2 py-0.5 rounded">
+                    Financial Audit &amp; P&amp;L
+                  </span>
+                  <span className="text-xs text-brand-gold font-bold">
+                    Net Profit / Loss Tracking Active
+                  </span>
+                </div>
+                <h3 className="font-heading font-black text-xl text-white">
+                  Monthly Profit &amp; Loss Statements &amp; Expense Ledger
+                </h3>
+                <p className="text-xs text-white/80 max-w-xl">
+                  Analyze wholesale product costs (COGS), Meta/Facebook ad spend, courier delivery fees, and packaging materials with instant printable monthly statements.
                 </p>
-                <p className="font-heading text-3xl font-bold text-amber-600 mt-2">
-                  {pendingOrdersCount}
-                </p>
-                <p className="text-[11px] text-stone-500 mt-1">Require confirmation</p>
               </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-                  Total Revenue
-                </p>
-                <p className="font-heading text-3xl font-bold text-brand-green mt-2">
-                  {formatPrice(totalRevenue)}
-                </p>
-                <p className="text-[11px] text-stone-500 mt-1">From completed orders</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-sm">
-                <p className="text-xs font-bold text-stone-400 uppercase tracking-wider">
-                  Active Products
-                </p>
-                <p className="font-heading text-3xl font-bold text-brand-charcoal mt-2">
-                  {productList.length}
-                </p>
-                <p className="text-[11px] text-stone-500 mt-1">Across 5 categories</p>
-              </div>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className="bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal font-black text-xs px-5 py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2 flex-shrink-0"
+              >
+                <BarChart3 className="w-4 h-4" />
+                View Monthly P&amp;L Reports &rarr;
+              </button>
             </div>
 
             {/* Quick Actions & Recent Orders */}
@@ -1459,7 +1656,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold">1 Liter / 1 Kg Price (PKR)</label>
+                    <label className="font-bold">1L Selling Price (PKR)</label>
                     <input
                       type="number"
                       value={newPrice1L}
@@ -1469,12 +1666,32 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   </div>
 
                   <div className="space-y-1">
-                    <label className="font-bold">500ml / 500g Price (PKR)</label>
+                    <label className="font-bold text-amber-800">1L Wholesale Cost (PKR)</label>
+                    <input
+                      type="number"
+                      value={newCost1L}
+                      onChange={(e) => setNewCost1L(e.target.value)}
+                      className="w-full px-3 py-2 border border-amber-300 bg-amber-50/50 rounded-xl font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold">500ml Selling Price (PKR)</label>
                     <input
                       type="number"
                       value={newPrice500ml}
                       onChange={(e) => setNewPrice500ml(e.target.value)}
                       className="w-full px-3 py-2 border rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-amber-800">500ml Wholesale Cost (PKR)</label>
+                    <input
+                      type="number"
+                      value={newCost500ml}
+                      onChange={(e) => setNewCost500ml(e.target.value)}
+                      className="w-full px-3 py-2 border border-amber-300 bg-amber-50/50 rounded-xl font-bold"
                     />
                   </div>
                 </div>
@@ -1504,7 +1721,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                   <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider">
                     <th className="py-3 px-3">Product Name</th>
                     <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3">Variants, Pricing &amp; Stock Count</th>
+                    <th className="py-3 px-3">Variants, Wholesale Cost &amp; Stock Count</th>
                     <th className="py-3 px-3">Inventory Status</th>
                     <th className="py-3 px-3">Actions</th>
                   </tr>
@@ -1525,23 +1742,47 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                         </span>
                       </td>
                       <td className="py-4 px-3 space-y-2">
-                        {prod.variants.map((v) => (
-                          <div
-                            key={v.id}
-                            className="flex flex-wrap items-center gap-2 bg-stone-50 p-2 rounded-xl border border-stone-200"
-                          >
-                            <span className="font-bold text-stone-800 text-[11px] min-w-[70px]">
-                              {v.name}:
-                            </span>
-                            <span className="font-mono text-brand-green font-bold text-xs">
-                              {formatPrice(v.price)}
-                            </span>
-                            {v.compareAtPrice && v.compareAtPrice > v.price && (
-                              <span className="font-mono line-through text-stone-400 text-[10px]">
-                                {formatPrice(v.compareAtPrice)}
+                        {prod.variants.map((v) => {
+                          const is1L = v.size?.toLowerCase().includes('1l') || v.name.includes('1');
+                          const cost = v.costPrice ?? (is1L ? 480 : 240);
+                          const margin = v.price - cost;
+                          const marginPct = v.price > 0 ? Math.round((margin / v.price) * 100) : 0;
+                          return (
+                            <div
+                              key={v.id}
+                              className="flex flex-wrap items-center gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-200"
+                            >
+                              <span className="font-bold text-stone-800 text-[11px] min-w-[70px]">
+                                {v.name}:
                               </span>
-                            )}
-                            <div className="flex items-center gap-1.5 ml-auto">
+                              <span className="font-mono text-brand-green font-bold text-xs" title="Customer Selling Price">
+                                Sale: {formatPrice(v.price)}
+                              </span>
+                              {v.compareAtPrice && v.compareAtPrice > v.price && (
+                                <span className="font-mono line-through text-stone-400 text-[10px]">
+                                  {formatPrice(v.compareAtPrice)}
+                                </span>
+                              )}
+
+                              {/* Editable Wholesale Cost Price */}
+                              <div className="flex items-center gap-1.5 bg-amber-50 px-2 py-0.5 rounded-xl border border-amber-200 shadow-2xs">
+                                <span className="text-amber-900 font-bold text-[10px]">Wholesale Cost:</span>
+                                <span className="font-mono font-bold text-amber-950 text-xs">Rs.</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={cost}
+                                  onChange={(e) => updateVariantCostPrice(prod.id, v.id, Number(e.target.value) || 0)}
+                                  className="w-16 px-1.5 py-0.5 border border-amber-300 rounded-lg text-center font-mono font-bold text-xs bg-white text-stone-900"
+                                  title="Click to edit purchase / wholesale cost per bottle"
+                                />
+                              </div>
+
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 font-mono">
+                                Margin: +{formatPrice(margin)} ({marginPct}%)
+                              </span>
+
+                              <div className="flex items-center gap-1.5 ml-auto">
                               <span className="text-[10px] text-stone-500">Stock:</span>
                               <div className="inline-flex items-center border border-stone-300 rounded-lg overflow-hidden bg-white shadow-2xs">
                                 <button
@@ -1593,7 +1834,8 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                               </button>
                             </div>
                           </div>
-                        ))}
+                        );
+                      })}
                       </td>
                       <td className="py-4 px-3">
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
@@ -1662,7 +1904,424 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
           </div>
         )}
 
-        {/* TAB 5: SETTINGS */}
+        {/* TAB 5: P&L, EXPENSES & MONTHLY REPORTS */}
+        {activeTab === 'reports' && (
+          <div className="space-y-8">
+            {/* Top Controls Bar */}
+            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              <div>
+                <h3 className="font-heading font-black text-xl text-brand-charcoal flex items-center gap-2">
+                  <BarChart3 className="w-6 h-6 text-brand-green" />
+                  Monthly Financial Statement &amp; P&amp;L Ledger
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  ماہانہ سیلز کا حجم، فیس بک ایڈز کی لاگت، پیکنگ و کوریئر اخراجات، اور حتمی منافع و نقصان برائے ریکارڈ۔
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                {/* Month Selector Dropdown */}
+                <div className="flex items-center gap-2 bg-stone-50 border border-stone-300 rounded-2xl px-3.5 py-2 shadow-2xs">
+                  <Calendar className="w-4 h-4 text-brand-green flex-shrink-0" />
+                  <span className="text-xs font-bold text-stone-600">Month:</span>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="bg-transparent font-mono font-bold text-xs text-brand-charcoal focus:outline-none cursor-pointer"
+                  >
+                    {availableMonths.map((m) => {
+                      const [y, mon] = m.split('-');
+                      const d = new Date(Number(y), Number(mon) - 1, 1);
+                      const label = d.toLocaleDateString('en-PK', { month: 'long', year: 'numeric' });
+                      return (
+                        <option key={m} value={m}>
+                          {label} ({m})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Add Expense Button */}
+                <button
+                  onClick={() => setShowAddExpenseModal(true)}
+                  className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-3.5 py-2 rounded-2xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                >
+                  <Plus className="w-4 h-4 text-brand-gold" />
+                  + Log Expense
+                </button>
+
+                {/* View Printable Statement Button */}
+                <button
+                  onClick={() => setShowMonthlyStatementModal(true)}
+                  className="inline-flex items-center gap-1.5 bg-brand-gold hover:bg-brand-gold-dark text-brand-charcoal px-4 py-2 rounded-2xl text-xs font-black transition-all shadow-sm active:scale-95"
+                >
+                  <Printer className="w-4 h-4" />
+                  🖨️ Print Statement / PDF
+                </button>
+
+                {/* Export CSV */}
+                <button
+                  onClick={() => {
+                    const csv = generateMonthlyReportCSV(currentMonthReport, selectedMonthExpenses);
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Soghat-Financial-Report-${currentMonthReport.month}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    setNotificationToast('CSV spreadsheet downloaded!');
+                    setTimeout(() => setNotificationToast(null), 2500);
+                  }}
+                  className="inline-flex items-center gap-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all shadow-2xs"
+                  title="Download Excel / CSV spreadsheet file"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+                  CSV
+                </button>
+
+                {/* Base Rates Configuration */}
+                <button
+                  onClick={() => setShowFinSettingsModal(true)}
+                  className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-xl transition-colors"
+                  title="Configure base rates (Default wholesale price, packaging & courier charges)"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Big KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Total Net Sales */}
+              <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      Total Sales Revenue ({currentMonthReport.monthName})
+                    </p>
+                    <p className="font-heading text-3xl font-black text-brand-green mt-2">
+                      {formatPrice(currentMonthReport.netRevenue)}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-brand-green flex items-center justify-center font-bold">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-stone-100 flex flex-wrap justify-between text-[11px] text-stone-500">
+                  <span>{currentMonthReport.ordersCount} Orders ({currentMonthReport.totalLiters} Liters)</span>
+                  <span className="font-mono font-bold text-stone-700">Gross: {formatPrice(currentMonthReport.grossSales)}</span>
+                </div>
+              </div>
+
+              {/* Card 2: Product Wholesale Cost (COGS) */}
+              <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      Wholesale Product Cost (COGS)
+                    </p>
+                    <p className="font-heading text-3xl font-black text-stone-800 mt-2">
+                      {formatPrice(currentMonthReport.cogsProductCost)}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                    <Package className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-stone-100 flex flex-wrap justify-between text-[11px] text-stone-500">
+                  <span>{currentMonthReport.bottles1LSold}x1L, {currentMonthReport.bottles500mlSold}x500ml</span>
+                  <span className="font-mono font-bold text-emerald-700">Gross Margin: {formatPrice(currentMonthReport.grossProfit)}</span>
+                </div>
+              </div>
+
+              {/* Card 3: Total Expenses */}
+              <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm relative overflow-hidden">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                      Total Monthly Expenses
+                    </p>
+                    <p className="font-heading text-3xl font-black text-red-600 mt-2">
+                      {formatPrice(currentMonthReport.totalExpenses)}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                    <TrendingDown className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-stone-100 text-[11px] text-stone-500 truncate">
+                  COGS + Ads ({formatPrice(currentMonthReport.adSpend)}) + Courier &amp; Packaging
+                </div>
+              </div>
+
+              {/* Card 4: Net Profit or Loss */}
+              <div
+                className={`rounded-3xl p-6 border-2 shadow-sm relative overflow-hidden ${
+                  currentMonthReport.isProfit ? 'bg-emerald-50/70 border-emerald-500' : 'bg-red-50/70 border-red-500'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span
+                      className={`inline-block text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded text-white ${
+                        currentMonthReport.isProfit ? 'bg-emerald-700' : 'bg-red-700'
+                      }`}
+                    >
+                      {currentMonthReport.isProfit ? 'PROFITABLE (خالص منافع)' : 'NET LOSS (خالص نقصان)'}
+                    </span>
+                    <p
+                      className="font-heading text-3xl font-black mt-1.5"
+                      style={{ color: currentMonthReport.isProfit ? '#065f46' : '#991b1b' }}
+                    >
+                      {formatPrice(currentMonthReport.netProfit)}
+                    </p>
+                  </div>
+                  <div
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold"
+                    style={{
+                      background: currentMonthReport.isProfit ? '#d1fae5' : '#fee2e2',
+                      color: currentMonthReport.isProfit ? '#047857' : '#b91c1c',
+                    }}
+                  >
+                    {currentMonthReport.isProfit ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center text-[11px]">
+                  <span className="font-bold text-stone-600">Net Profit Margin:</span>
+                  <span
+                    className="font-mono font-black text-sm"
+                    style={{ color: currentMonthReport.isProfit ? '#047857' : '#b91c1c' }}
+                  >
+                    {currentMonthReport.profitMarginPercent}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 4 Expense Category Breakdown Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Category 1: Ads */}
+              <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-900">
+                      Social Media Ads (اشتہارات)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-stone-900 mt-1">
+                      {formatPrice(currentMonthReport.adSpend)}
+                    </p>
+                  </div>
+                  <span className="p-2 rounded-xl bg-blue-50 text-blue-700 text-xs">📱</span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Facebook, Instagram, Google &amp; TikTok Ad Campaigns
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewExpenseCategory('ads');
+                    setNewExpenseTitle('Meta / Facebook Ads Campaign');
+                    setShowAddExpenseModal(true);
+                  }}
+                  className="w-full text-center py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-xl font-bold text-xs transition-colors"
+                >
+                  + Add Ad Spend
+                </button>
+              </div>
+
+              {/* Category 2: Packaging */}
+              <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-900">
+                      Packaging Materials (پیکنگ)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-stone-900 mt-1">
+                      {formatPrice(currentMonthReport.packagingCost)}
+                    </p>
+                  </div>
+                  <span className="p-2 rounded-xl bg-amber-50 text-amber-700 text-xs">📦</span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Carton boxes, bubble wrap, tape &amp; flyer pockets
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewExpenseCategory('packaging');
+                    setNewExpenseTitle('Packaging Cartons & Bubble Wrap');
+                    setShowAddExpenseModal(true);
+                  }}
+                  className="w-full text-center py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl font-bold text-xs transition-colors"
+                >
+                  + Add Packaging Cost
+                </button>
+              </div>
+
+              {/* Category 3: Courier Delivery */}
+              <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
+                      Courier Dispatch Fee (ڈلیوری)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-stone-900 mt-1">
+                      {formatPrice(currentMonthReport.courierCost)}
+                    </p>
+                  </div>
+                  <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs">🚚</span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Charges paid to TCS, Leopards, Trax or local riders
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewExpenseCategory('delivery');
+                    setNewExpenseTitle('Courier Delivery Invoice Payment');
+                    setShowAddExpenseModal(true);
+                  }}
+                  className="w-full text-center py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl font-bold text-xs transition-colors"
+                >
+                  + Add Courier Bill
+                </button>
+              </div>
+
+              {/* Category 4: Operational & Overheads */}
+              <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-purple-900">
+                      Operational &amp; Misc (کرایہ و دیگر)
+                    </p>
+                    <p className="font-heading text-2xl font-black text-stone-900 mt-1">
+                      {formatPrice(currentMonthReport.operationalCost + currentMonthReport.otherExpenses)}
+                    </p>
+                  </div>
+                  <span className="p-2 rounded-xl bg-purple-50 text-purple-700 text-xs">🏢</span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Facility rent, worker wages, electricity bills &amp; fuel
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewExpenseCategory('operational');
+                    setNewExpenseTitle('Monthly Facility Rent / Staff');
+                    setShowAddExpenseModal(true);
+                  }}
+                  className="w-full text-center py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-xl font-bold text-xs transition-colors"
+                >
+                  + Add Operational Cost
+                </button>
+              </div>
+            </div>
+
+            {/* Itemized Expenses Ledger Table */}
+            <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h4 className="font-heading font-bold text-base text-brand-charcoal">
+                    Itemized Expenses Log &bull; {currentMonthReport.monthName} ({selectedMonthExpenses.length} Records)
+                  </h4>
+                  <p className="text-xs text-stone-500">
+                    All recorded operational expenditures for financial auditing and tax records.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAddExpenseModal(true)}
+                    className="inline-flex items-center gap-1.5 bg-brand-green hover:bg-brand-green-light text-brand-cream px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-brand-gold" />
+                    + Add Expense Entry
+                  </button>
+                </div>
+              </div>
+
+              {selectedMonthExpenses.length === 0 ? (
+                <div className="py-10 text-center space-y-3 bg-stone-50 rounded-2xl border border-dashed border-stone-300">
+                  <p className="text-sm font-semibold text-stone-600">
+                    No custom expense records logged yet for {currentMonthReport.monthName}.
+                  </p>
+                  <p className="text-xs text-stone-500 max-w-md mx-auto">
+                    (Standard baseline packaging @ Rs. {finSettings.packagingCostPerOrder}/order and courier @ Rs. {finSettings.courierCostPerOrder}/order are calculated automatically).
+                  </p>
+                  <button
+                    onClick={() => setShowAddExpenseModal(true)}
+                    className="inline-flex items-center gap-1.5 bg-brand-green text-brand-cream px-4 py-2 rounded-xl text-xs font-bold hover:bg-brand-green-light"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-brand-gold" />
+                    Log First Expense for {currentMonthReport.monthName}
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-stone-200 text-stone-400 uppercase tracking-wider text-[10px]">
+                        <th className="py-3 px-3">Date</th>
+                        <th className="py-3 px-3">Category</th>
+                        <th className="py-3 px-3">Title / Description</th>
+                        <th className="py-3 px-3">Notes &amp; Details</th>
+                        <th className="py-3 px-3 text-right">Amount (PKR)</th>
+                        <th className="py-3 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {selectedMonthExpenses.map((exp) => (
+                        <tr key={exp.id} className="hover:bg-stone-50">
+                          <td className="py-3 px-3 font-mono text-stone-600 whitespace-nowrap">
+                            {exp.date}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`uppercase text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                exp.category === 'ads'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : exp.category === 'packaging'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : exp.category === 'delivery'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-purple-100 text-purple-800'
+                              }`}
+                            >
+                              {exp.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-bold text-stone-900">
+                            {exp.title}
+                          </td>
+                          <td className="py-3 px-3 text-stone-500 max-w-xs truncate">
+                            {exp.notes || '-'}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-red-600 text-sm">
+                            {formatPrice(exp.amount)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => handleDeleteExpense(exp.id)}
+                              className="text-stone-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete expense"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: SETTINGS */}
         {activeTab === 'settings' && (
           <div className="bg-white rounded-3xl p-6 md:p-8 border border-stone-200 shadow-sm space-y-6 max-w-2xl">
             <h3 className="font-heading font-bold text-lg text-brand-charcoal">
@@ -2286,6 +2945,221 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
               setTimeout(() => setNotificationToast(null), 3000);
             }}
           />
+        )}
+
+        {/* ── Official Printable Monthly Financial Statement & P&L Modal ── */}
+        {showMonthlyStatementModal && (
+          <MonthlyReportModal
+            report={currentMonthReport}
+            expenses={selectedMonthExpenses}
+            onClose={() => setShowMonthlyStatementModal(false)}
+          />
+        )}
+
+        {/* ── Add Expense Entry Modal ── */}
+        {showAddExpenseModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-stone-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex justify-between items-center border-b border-stone-200 pb-3">
+                <h3 className="font-heading font-black text-lg text-brand-charcoal flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-brand-green" />
+                  Log Business Expense (خرچ درج کریں)
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddExpenseModal(false)}
+                  className="text-stone-400 hover:text-stone-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateExpense} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Expense Category</label>
+                  <select
+                    value={newExpenseCategory}
+                    onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
+                    className="w-full px-3 py-2 border rounded-xl bg-white font-medium"
+                  >
+                    <option value="ads">📱 Social Media Ads (فیس بک، انسٹاگرام، گوگل ایڈز)</option>
+                    <option value="packaging">📦 Packaging Materials (کارٹن، ببل ریپ، بوتلیں، ٹیپ)</option>
+                    <option value="delivery">🚚 Courier Delivery (کوریئر کمپنیوں کو ادا کردہ اصل فیس)</option>
+                    <option value="operational">🏢 Operational &amp; Rent (دکان کا کرایہ، بجلی کا بل، ملازمین)</option>
+                    <option value="inventory">🌾 Raw Material &amp; Inventory (خام مال، بیج، گھی کی خریداری)</option>
+                    <option value="other">📝 Miscellaneous (دیگر متفرق اخراجات)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Expense Title / Description</label>
+                  <input
+                    type="text"
+                    required
+                    value={newExpenseTitle}
+                    onChange={(e) => setNewExpenseTitle(e.target.value)}
+                    placeholder="e.g. Meta Ads Video Campaign Nov 23"
+                    className="w-full px-3 py-2 border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Amount (PKR)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-stone-400 font-bold text-xs">Rs.</span>
+                      <input
+                        type="number"
+                        min={1}
+                        required
+                        value={newExpenseAmount}
+                        onChange={(e) => setNewExpenseAmount(e.target.value)}
+                        placeholder="1500"
+                        className="w-full pl-9 pr-3 py-2 border rounded-xl font-mono font-bold text-stone-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Expense Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={newExpenseDate}
+                      onChange={(e) => setNewExpenseDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-stone-700 block mb-1">Notes &amp; Particulars (Optional)</label>
+                  <textarea
+                    rows={2}
+                    value={newExpenseNotes}
+                    onChange={(e) => setNewExpenseNotes(e.target.value)}
+                    placeholder="e.g. Run on Meta Ads Manager targeting Rawalpindi/Islamabad"
+                    className="w-full px-3 py-2 border rounded-xl resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light transition-all shadow-sm"
+                  >
+                    Save Expense Record
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddExpenseModal(false)}
+                    className="bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold hover:bg-stone-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── Base Financial Rates & COGS Configuration Modal ── */}
+        {showFinSettingsModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-stone-200 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex justify-between items-center border-b border-stone-200 pb-3">
+                <h3 className="font-heading font-black text-lg text-brand-charcoal flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-brand-green" />
+                  Base Rates &amp; Default Costs
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowFinSettingsModal(false)}
+                  className="text-stone-400 hover:text-stone-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveFinSettings} className="space-y-3.5 text-xs">
+                <p className="text-stone-500 text-[11px]">
+                  یہ بنیادی ریٹس ہر آرڈر کا خود بخود منافع اور لاگت حساب کرنے کے لیے استعمال ہوتے ہیں۔
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Default 1L Wholesale Cost (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={finSettings.defaultCostPrice1L}
+                      onChange={(e) =>
+                        setFinSettings({ ...finSettings, defaultCostPrice1L: Number(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Default 500ml Wholesale Cost (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={finSettings.defaultCostPrice500ml}
+                      onChange={(e) =>
+                        setFinSettings({ ...finSettings, defaultCostPrice500ml: Number(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Packaging Cost / Order (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={finSettings.packagingCostPerOrder}
+                      onChange={(e) =>
+                        setFinSettings({ ...finSettings, packagingCostPerOrder: Number(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
+                    />
+                    <span className="text-[10px] text-stone-400">Carton, tape, bubble wrap</span>
+                  </div>
+                  <div>
+                    <label className="font-bold text-stone-700 block mb-1">Courier Fee / Order (PKR)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={finSettings.courierCostPerOrder}
+                      onChange={(e) =>
+                        setFinSettings({ ...finSettings, courierCostPerOrder: Number(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2 border rounded-xl font-mono font-bold"
+                    />
+                    <span className="text-[10px] text-stone-400">Paid to TCS/Leopards</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-brand-green text-brand-cream py-2.5 rounded-xl font-bold hover:bg-brand-green-light"
+                  >
+                    Save Base Rates
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFinSettingsModal(false)}
+                    className="bg-stone-100 text-stone-600 px-4 py-2.5 rounded-xl font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </main>
     </div>

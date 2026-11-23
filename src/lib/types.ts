@@ -6,8 +6,9 @@ export interface ProductVariant {
   id: string;
   name: string;           // e.g. "1 Liter", "500ml"
   size: string;           // e.g. "1L", "500ml"
-  price: number;          // in PKR
+  price: number;          // in PKR (Selling Price)
   compareAtPrice?: number; // optional original price (only if real)
+  costPrice?: number;     // Wholesale / Purchase cost in PKR (خریداری قیمت / لاگت)
   sku: string;
   weight: number;         // in grams
   image?: string;         // variant-specific image
@@ -159,4 +160,62 @@ export interface HeroBanner {
   secondaryCta?: { text: string; href: string };
   backgroundImage?: string;
   isActive: boolean;
+}
+
+// ============================================================
+// Accounting, Expenses & Monthly Profit & Loss (P&L) Reports
+// ============================================================
+
+export type ExpenseCategory =
+  | 'ads'         // Facebook / Instagram / Google / TikTok Ads
+  | 'packaging'   // Boxes, Flyers, Bubble Wrap, Bottles, Seals, Tape
+  | 'delivery'    // Courier delivery fees paid to TCS/Leopards/Trax
+  | 'inventory'   // Raw mustard seeds, oil procurement, bulk bottles
+  | 'operational' // Rent, utilities, labor, fuel
+  | 'other';      // Miscellaneous expenses
+
+export interface ExpenseEntry {
+  id: string;
+  date: string;          // YYYY-MM-DD
+  month: string;         // YYYY-MM e.g. "2026-11"
+  category: ExpenseCategory;
+  title: string;
+  amount: number;        // in PKR
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FinancialSettings {
+  defaultCostPrice1L: number;    // Wholesale / Purchase cost per 1L bottle (e.g. 480 PKR)
+  defaultCostPrice500ml: number; // Wholesale / Purchase cost per 500ml bottle (e.g. 240 PKR)
+  packagingCostPerOrder: number; // Estimated packaging cost per parcel (e.g. 40 PKR)
+  courierCostPerOrder: number;   // Estimated actual courier delivery fee per parcel (e.g. 200 PKR)
+}
+
+export interface MonthlyFinancialReport {
+  month: string;                 // YYYY-MM e.g. "2026-11"
+  monthName: string;             // e.g. "November 2026"
+  ordersCount: number;
+  totalLiters: number;
+  bottles1LSold: number;
+  bottles500mlSold: number;
+  grossSales: number;            // Total product prices before discount
+  discountTotal: number;         // Total discounts given to customers
+  shippingCollected: number;     // Shipping fee paid by customers
+  netRevenue: number;            // (Gross Sales - Discounts) + Shipping Collected
+
+  // Expense breakdown
+  cogsProductCost: number;       // Wholesale product purchase cost (COGS)
+  adSpend: number;               // Total advertising spend (Meta, Google, etc.)
+  packagingCost: number;         // Packaging material expenses
+  courierCost: number;           // Actual courier charges paid
+  operationalCost: number;       // Rent, staff, utilities
+  otherExpenses: number;         // Miscellaneous
+  totalExpenses: number;         // Sum of all costs
+
+  // Profitability metrics
+  grossProfit: number;           // Net Revenue - COGS
+  netProfit: number;             // Net Revenue - Total Expenses
+  profitMarginPercent: number;   // (Net Profit / Net Revenue) * 100
+  isProfit: boolean;             // True if Net Profit >= 0
 }

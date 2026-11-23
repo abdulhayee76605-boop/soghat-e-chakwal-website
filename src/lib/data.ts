@@ -119,6 +119,7 @@ export const products: Product[] = [
         size: '1L',
         price: 700,
         compareAtPrice: 750,
+        costPrice: 480, // Wholesale / Purchase cost per bottle in PKR
         sku: 'SEC-MO-1L',
         weight: 1100,
         image: '/images/products/mustard-oil-1l.png',
@@ -194,6 +195,7 @@ export const products: Product[] = [
         size: '500ml',
         price: 350,
         compareAtPrice: 450,
+        costPrice: 240, // Wholesale / Purchase cost per bottle in PKR
         sku: 'SEC-MO-500ML',
         weight: 600,
         image: '/images/products/mustard-oil-500ml.png',
