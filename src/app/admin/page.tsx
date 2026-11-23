@@ -480,15 +480,14 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     setInvoiceOrder(newOrder);
   };
 
-  // Load orders from API & live sync
+  // Load orders & finances from API & live sync
   useEffect(() => {
     if (isAuthenticated) {
       fetchOrders();
       fetchFinances();
-      // Auto-refresh every 5 seconds for live visitor sessions, checkouts, and incoming customer orders
+      // Auto-refresh orders every 5 seconds for incoming checkouts & customer orders
       const interval = setInterval(() => {
         fetchOrders();
-        fetchFinances();
       }, 5000);
       return () => clearInterval(interval);
     }
@@ -511,13 +510,36 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       const data = await fetchServerExpenses();
       setExpenses(data.expenses);
       setFinSettings(data.settings);
+      const rate = data.settings.monthlyWholesaleRates?.[selectedMonth];
+      setMonthCost1L(
+        rate && typeof rate.cost1L === 'number' && rate.cost1L > 0
+          ? rate.cost1L.toString()
+          : (data.settings.defaultCostPrice1L || 480).toString()
+      );
+      setMonthCost500ml(
+        rate && typeof rate.cost500ml === 'number' && rate.cost500ml > 0
+          ? rate.cost500ml.toString()
+          : (data.settings.defaultCostPrice500ml || 240).toString()
+      );
     } catch {
+      const stored = getStoredFinancialSettings();
       setExpenses(getStoredExpenses());
-      setFinSettings(getStoredFinancialSettings());
+      setFinSettings(stored);
+      const rate = stored.monthlyWholesaleRates?.[selectedMonth];
+      setMonthCost1L(
+        rate && typeof rate.cost1L === 'number' && rate.cost1L > 0
+          ? rate.cost1L.toString()
+          : (stored.defaultCostPrice1L || 480).toString()
+      );
+      setMonthCost500ml(
+        rate && typeof rate.cost500ml === 'number' && rate.cost500ml > 0
+          ? rate.cost500ml.toString()
+          : (stored.defaultCostPrice500ml || 240).toString()
+      );
     }
   };
 
-  // Sync monthly wholesale purchase inputs when selectedMonth or settings change
+  // Sync monthly wholesale purchase inputs ONLY when selectedMonth changes (never overwrite active input)
   useEffect(() => {
     const rate = finSettings.monthlyWholesaleRates?.[selectedMonth];
     setMonthCost1L(
@@ -530,13 +552,75 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
         ? rate.cost500ml.toString()
         : (finSettings.defaultCostPrice500ml || 240).toString()
     );
-  }, [selectedMonth, finSettings]);
+  }, [selectedMonth]);
+
+  const handleUpdate1LCost = (val: string) => {
+    setMonthCost1L(val);
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      const updatedSettings: FinancialSettings = {
+        ...finSettings,
+        defaultCostPrice1L: num,
+        monthlyWholesaleRates: {
+          ...(finSettings.monthlyWholesaleRates || {}),
+          [selectedMonth]: {
+            cost1L: num,
+            cost500ml: Math.max(0, Number(monthCost500ml) || finSettings.defaultCostPrice500ml || 240),
+          },
+        },
+      };
+      setFinSettings(updatedSettings);
+      saveFinancialSettings(updatedSettings);
+
+      // Sync product variants (1L bottles)
+      const updated = productList.map((p) => ({
+        ...p,
+        variants: p.variants.map((v) => {
+          const is1L = v.size?.toLowerCase().includes('1l') || v.name.includes('1');
+          return is1L ? { ...v, costPrice: num } : v;
+        }),
+      }));
+      saveProductList(updated);
+    }
+  };
+
+  const handleUpdate500mlCost = (val: string) => {
+    setMonthCost500ml(val);
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      const updatedSettings: FinancialSettings = {
+        ...finSettings,
+        defaultCostPrice500ml: num,
+        monthlyWholesaleRates: {
+          ...(finSettings.monthlyWholesaleRates || {}),
+          [selectedMonth]: {
+            cost1L: Math.max(0, Number(monthCost1L) || finSettings.defaultCostPrice1L || 480),
+            cost500ml: num,
+          },
+        },
+      };
+      setFinSettings(updatedSettings);
+      saveFinancialSettings(updatedSettings);
+
+      // Sync product variants (500ml bottles)
+      const updated = productList.map((p) => ({
+        ...p,
+        variants: p.variants.map((v) => {
+          const is500 = v.size?.toLowerCase().includes('500') || v.name.includes('500');
+          return is500 ? { ...v, costPrice: num } : v;
+        }),
+      }));
+      saveProductList(updated);
+    }
+  };
 
   const handleSaveMonthWholesaleRates = () => {
     const cost1 = Math.max(0, Number(monthCost1L) || 0);
     const cost500 = Math.max(0, Number(monthCost500ml) || 0);
     const updatedSettings: FinancialSettings = {
       ...finSettings,
+      defaultCostPrice1L: cost1 > 0 ? cost1 : finSettings.defaultCostPrice1L,
+      defaultCostPrice500ml: cost500 > 0 ? cost500 : finSettings.defaultCostPrice500ml,
       monthlyWholesaleRates: {
         ...(finSettings.monthlyWholesaleRates || {}),
         [selectedMonth]: { cost1L: cost1, cost500ml: cost500 },
@@ -544,7 +628,17 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
     };
     setFinSettings(updatedSettings);
     saveFinancialSettings(updatedSettings);
-    setNotificationToast(`خریداری ریٹ برائے ${selectedMonth} محفوظ ہو گیا (1L: Rs. ${cost1}, 500ml: Rs. ${cost500})`);
+
+    const updated = productList.map((p) => ({
+      ...p,
+      variants: p.variants.map((v) => {
+        const is1L = v.size?.toLowerCase().includes('1l') || v.name.includes('1');
+        return is1L ? { ...v, costPrice: cost1 } : { ...v, costPrice: cost500 };
+      }),
+    }));
+    saveProductList(updated);
+
+    setNotificationToast(`خریداری ریٹ محفوظ ہو گیا (1L: Rs. ${cost1}, 500ml: Rs. ${cost500})`);
     setTimeout(() => setNotificationToast(null), 3000);
   };
 
@@ -625,13 +719,15 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
   };
 
   const updateVariantCostPrice = (productId: string, variantId: string, newCost: number) => {
+    const cost = Math.max(0, newCost);
+    const is1L = variantId.includes('1l') || variantId.includes('1-liter') || productId.includes('1-liter');
     const updated = productList.map((p) => {
       if (p.id === productId) {
         return {
           ...p,
           variants: p.variants.map((v) => {
             if (v.id === variantId) {
-              return { ...v, costPrice: Math.max(0, newCost) };
+              return { ...v, costPrice: cost };
             }
             return v;
           }),
@@ -640,7 +736,27 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
       return p;
     });
     saveProductList(updated);
-    setNotificationToast(`Wholesale cost updated to Rs. ${newCost}`);
+
+    // Sync with finSettings & monthly rate
+    const updatedSettings: FinancialSettings = {
+      ...finSettings,
+      defaultCostPrice1L: is1L ? cost : (finSettings.defaultCostPrice1L || 480),
+      defaultCostPrice500ml: !is1L ? cost : (finSettings.defaultCostPrice500ml || 240),
+      monthlyWholesaleRates: {
+        ...(finSettings.monthlyWholesaleRates || {}),
+        [selectedMonth]: {
+          cost1L: is1L ? cost : (finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost1L || finSettings.defaultCostPrice1L || 480),
+          cost500ml: !is1L ? cost : (finSettings.monthlyWholesaleRates?.[selectedMonth]?.cost500ml || finSettings.defaultCostPrice500ml || 240),
+        },
+      },
+    };
+    setFinSettings(updatedSettings);
+    saveFinancialSettings(updatedSettings);
+
+    if (is1L) setMonthCost1L(cost.toString());
+    else setMonthCost500ml(cost.toString());
+
+    setNotificationToast(`خریداری قیمت محفوظ ہو گئی: Rs. ${cost}`);
     setTimeout(() => setNotificationToast(null), 2500);
   };
 
@@ -2092,7 +2208,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       type="number"
                       min={0}
                       value={monthCost1L}
-                      onChange={(e) => setMonthCost1L(e.target.value)}
+                      onChange={(e) => handleUpdate1LCost(e.target.value)}
                       placeholder="480"
                       className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
                     />
@@ -2105,7 +2221,7 @@ Return: Soghat-e-Chakwal, Shop MC33, Street 1, Ghauri Town, Phase 7, Islamabad (
                       type="number"
                       min={0}
                       value={monthCost500ml}
-                      onChange={(e) => setMonthCost500ml(e.target.value)}
+                      onChange={(e) => handleUpdate500mlCost(e.target.value)}
                       placeholder="240"
                       className="w-20 font-mono font-black text-sm text-stone-900 focus:outline-none"
                     />

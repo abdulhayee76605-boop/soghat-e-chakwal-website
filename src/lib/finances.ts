@@ -48,20 +48,34 @@ export function saveStoredExpenses(expenses: ExpenseEntry[]): void {
 }
 
 export async function fetchServerExpenses(): Promise<{ expenses: ExpenseEntry[]; settings: FinancialSettings }> {
+  const localSettings = getStoredFinancialSettings();
   try {
     const res = await fetch('/api/finances', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.expenses)) {
+        // Merge: keep user's local wholesale costs safe so server never overwrites them with 480
+        const mergedSettings: FinancialSettings = {
+          defaultCostPrice1L: localSettings.defaultCostPrice1L || data.settings?.defaultCostPrice1L || 480,
+          defaultCostPrice500ml: localSettings.defaultCostPrice500ml || data.settings?.defaultCostPrice500ml || 240,
+          monthlyWholesaleRates: {
+            ...(data.settings?.monthlyWholesaleRates || {}),
+            ...(localSettings.monthlyWholesaleRates || {}),
+          },
+          packagingCostPerOrder: 0,
+          courierCostPerOrder: 0,
+        };
+
         if (typeof window !== 'undefined') {
           saveStoredExpenses(data.expenses);
-          if (data.settings) {
-            saveFinancialSettings(data.settings);
-          }
+          try {
+            localStorage.setItem(FINANCIAL_SETTINGS_KEY, JSON.stringify(mergedSettings));
+          } catch {}
         }
+
         return {
           expenses: data.expenses,
-          settings: data.settings || defaultFinancialSettings,
+          settings: mergedSettings,
         };
       }
     }
@@ -70,7 +84,7 @@ export async function fetchServerExpenses(): Promise<{ expenses: ExpenseEntry[];
   }
   return {
     expenses: getStoredExpenses(),
-    settings: getStoredFinancialSettings(),
+    settings: localSettings,
   };
 }
 

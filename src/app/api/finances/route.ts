@@ -41,7 +41,14 @@ export async function POST(request: Request) {
     }
 
     if (body.type === 'settings' && body.settings) {
-      serverSettings = { ...serverSettings, ...body.settings };
+      serverSettings = {
+        ...serverSettings,
+        ...body.settings,
+        monthlyWholesaleRates: {
+          ...(serverSettings.monthlyWholesaleRates || {}),
+          ...(body.settings.monthlyWholesaleRates || {}),
+        },
+      };
       return NextResponse.json({ success: true, expenses: serverExpenses, settings: serverSettings });
     }
 
